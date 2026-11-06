@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
 import 'auth_screens.dart';
+import 'chat.dart';
 import 'clients.dart';
 import 'widgets.dart';
 
@@ -15,7 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[const DashboardTab(), const ClientsTab(), const ProfileTab()];
+    final pages = <Widget>[const DashboardTab(), const ClientsTab(), const ChatHubTab(), const ProfileTab()];
     return Scaffold(
       body: SafeArea(child: pages[tab]),
       bottomNavigationBar: NavigationBar(
@@ -24,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.people_outline), label: 'Clients'),
+          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: 'Chats'),
           NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
       ),
