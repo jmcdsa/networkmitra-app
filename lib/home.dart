@@ -3,6 +3,7 @@ import 'api.dart';
 import 'auth_screens.dart';
 import 'chat.dart';
 import 'clients.dart';
+import 'more.dart';
 import 'widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,7 +17,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[const DashboardTab(), const ClientsTab(), const ChatHubTab(), const ProfileTab()];
+    final pages = <Widget>[const DashboardTab(), const ClientsTab(), const ChatHubTab(), const KbTab(), const ProfileTab()];
     return Scaffold(
       body: SafeArea(child: pages[tab]),
       bottomNavigationBar: NavigationBar(
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.people_outline), label: 'Clients'),
           NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: 'Chats'),
+          NavigationDestination(icon: Icon(Icons.menu_book_outlined), label: 'Learn'),
           NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
       ),
@@ -108,6 +110,15 @@ class _DashboardTabState extends State<DashboardTab> {
                 trailing: Text('${b['count']}', style: const TextStyle(fontWeight: FontWeight.w700)),
               ))),
         ],
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.flag_outlined, color: Color(0xFF0F766E)),
+            title: const Text('My targets and sales'),
+            subtitle: const Text('See progress, add a sale'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TargetsScreen())),
+          ),
+        ),
         const SizedBox(height: 10),
         const Text("Today's follow-ups", style: TextStyle(fontWeight: FontWeight.w700)),
         if (today.isEmpty) const Padding(padding: EdgeInsets.all(12), child: Text('Nothing due today.')),
@@ -163,6 +174,23 @@ class ProfileTab extends StatelessWidget {
               return Text('${e.key}: $used${v['limit']}');
             }),
           ]),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.badge_outlined, color: Color(0xFF0F766E)),
+          title: const Text('My digital V-Card'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VCardScreen())),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.flag_outlined, color: Color(0xFF0F766E)),
+          title: const Text('Targets and sales'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TargetsScreen())),
         ),
       ),
       const SizedBox(height: 16),
