@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'api.dart';
 import 'widgets.dart';
 
@@ -432,6 +433,26 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _sendPhoto() async {
+    if (sending) return;
+    try {
+      final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1280, imageQuality: 80);
+      if (x == null) return;
+      setState(() => sending = true);
+      final m = Map<String, dynamic>.from(await Api.upload('conversations/${widget.convId}/messages', 'photo', x.path, fields: {'body': ''}) as Map);
+      setState(() {
+        if (!msgs.any((e) => e['id'] == m['id'])) msgs.add(m);
+      });
+      _toBottom();
+    } on ApiException catch (e) {
+      if (mounted) toast(context, e.message);
+    } catch (_) {
+      if (mounted) toast(context, 'Could not send the photo.');
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
   Future<void> _block() async {
     final id = widget.otherUserId;
     if (id == null) return;
@@ -523,6 +544,7 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
             child: Row(children: [
+              IconButton(onPressed: sending ? null : _sendPhoto, icon: const Icon(Icons.image_outlined)),
               Expanded(
                 child: TextField(
                   controller: text,

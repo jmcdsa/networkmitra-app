@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'api.dart';
 import 'auth_screens.dart';
 import 'chat.dart';
 import 'clients.dart';
 import 'more.dart';
+import 'notifications.dart';
+import 'upgrade.dart';
 import 'widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -90,7 +93,13 @@ class _DashboardTabState extends State<DashboardTab> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.all(16), children: [
-        Text('Hello, $name', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+        Row(children: [
+          Expanded(child: Text('Hello, $name', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700))),
+          IconButton(
+            icon: const Icon(Icons.notifications_none),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+          ),
+        ]),
         const SizedBox(height: 14),
         if (error != null) Text(error!, style: const TextStyle(color: Colors.red)),
         if (s != null) ...[
@@ -145,8 +154,34 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 }
 
-class ProfileTab extends StatelessWidget {
+class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
+  @override
+  State<ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<ProfileTab> {
+  @override
+  void initState() {
+    super.initState();
+    Api.refreshMe().then((_) {
+      if (mounted) setState(() {});
+    }).catchError((_) {});
+  }
+
+  Future<void> _pickPhoto() async {
+    try {
+      final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1024, imageQuality: 85);
+      if (x == null) return;
+      final d = await Api.upload('me/photo', 'photo', x.path);
+      Api.user?['photo_url'] = d['photo_url'];
+      if (mounted) setState(() {});
+    } on ApiException catch (e) {
+      if (mounted) toast(context, e.message);
+    } catch (_) {
+      if (mounted) toast(context, 'Could not use this photo.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +190,17 @@ class ProfileTab extends StatelessWidget {
     final co = u['company'] is Map ? (u['company'] as Map)['name'] : '';
     final feats = p['features'] is Map ? Map<String, dynamic>.from(p['features'] as Map) : <String, dynamic>{};
     return ListView(padding: const EdgeInsets.all(16), children: [
-      const CircleAvatar(radius: 36, child: Icon(Icons.person, size: 40)),
+      Center(
+        child: GestureDetector(
+          onTap: _pickPhoto,
+          child: CircleAvatar(
+            radius: 42,
+            backgroundImage: u['photo_url'] != null ? NetworkImage(u['photo_url'].toString()) : null,
+            child: u['photo_url'] == null ? const Icon(Icons.add_a_photo_outlined, size: 32) : null,
+          ),
+        ),
+      ),
+      const Center(child: Text('Tap to change photo', style: TextStyle(fontSize: 11, color: Colors.black45))),
       const SizedBox(height: 10),
       Center(child: Text((u['name'] ?? '').toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700))),
       Center(child: Text((u['email'] ?? '').toString())),
@@ -168,11 +213,28 @@ class ProfileTab extends StatelessWidget {
             Text('Plan: ${p['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             if (p['ends_at'] != null) Text('Valid until ${fmtDate(p['ends_at'] as String?)}'),
             const SizedBox(height: 8),
-            ...feats.entries.where((e) => e.value is Map && e.value['enabled'] == true && e.value['limit'] != null).map((e) {
-              final v = e.value as Map;
-              final used = v['used'] != null ? '${v['used']} / ' : 'limit ';
-              return Text('${e.key}: $used${v['limit']}');
+            ...kFeatureNames.entries.where((e) => feats.containsKey(e.key)).map((e) {
+              final v = Map<String, dynamic>.from(feats[e.key] as Map);
+              final on = v['enabled'] == true;
+              String line = limitText(v);
+              if (on && v['limit'] != null && v['used'] != null) line = '${v['used']} / ${v['limit']} used';
+              return InkWell(
+                onTap: on ? null : () => goUpgrade(context, '${e.value} is available on the Pro plan.'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(children: [
+                    Icon(on ? Icons.check_circle : Icons.lock, size: 18, color: on ? Colors.green : Colors.grey),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(e.value, style: TextStyle(color: on ? null : Colors.grey))),
+                    Text(on ? line : 'Pro', style: TextStyle(fontSize: 12, color: on ? Colors.black54 : Colors.grey)),
+                  ]),
+                ),
+              );
             }),
+            if (!isPro) ...[
+              const SizedBox(height: 8),
+              FilledButton(onPressed: () => goUpgrade(context), child: const Text('See Pro plan')),
+            ],
           ]),
         ),
       ),

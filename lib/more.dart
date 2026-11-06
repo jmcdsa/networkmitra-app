@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
+import 'upgrade.dart';
 import 'chat.dart' show asList;
 import 'widgets.dart';
 
@@ -177,6 +178,7 @@ class _VCardScreenState extends State<VCardScreen> {
   bool isPublic = true;
   bool full = false;
   List<Map<String, String>> links = [];
+  List<Map<String, String>> products = [];
   bool loading = true;
   bool busy = false;
   String? error;
@@ -197,6 +199,7 @@ class _VCardScreenState extends State<VCardScreen> {
     isPublic = v['is_public'] == true;
     full = v['is_full_card'] == true;
     links = ((v['social_links'] ?? []) as List).map((e) => {'label': '${(e as Map)['label']}', 'url': '${e['url']}'}).toList();
+    products = ((v['products'] ?? []) as List).map((e) => {'name': '${(e as Map)['name']}', 'price': '${e['price'] ?? ''}', 'url': '${e['url'] ?? ''}'}).toList();
   }
 
   Future<void> _load() async {
@@ -223,7 +226,10 @@ class _VCardScreenState extends State<VCardScreen> {
         'email': email.text.trim(),
         'is_public': isPublic,
       };
-      if (full) body['social_links'] = links;
+      if (full) {
+        body['social_links'] = links;
+        body['products'] = products;
+      }
       final v = Map<String, dynamic>.from(await Api.put('vcard', body) as Map);
       setState(() => _fill(v));
       if (mounted) toast(context, 'V-Card saved.');
@@ -254,6 +260,46 @@ class _VCardScreenState extends State<VCardScreen> {
     if (ok == true && l.text.trim().isNotEmpty) {
       setState(() => links.add({'label': l.text.trim(), 'url': u.text.trim()}));
     }
+  }
+
+  Future<void> _addProduct() async {
+    final n = TextEditingController();
+    final pr = TextEditingController();
+    final u = TextEditingController(text: 'https://');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add a product'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            field(n, 'Product name'),
+            field(pr, 'Price (optional)'),
+            field(u, 'Link (optional)', type: TextInputType.url),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Add')),
+        ],
+      ),
+    );
+    if (ok == true && n.text.trim().isNotEmpty) {
+      final link = u.text.trim() == 'https://' ? '' : u.text.trim();
+      setState(() => products.add({'name': n.text.trim(), 'price': pr.text.trim(), 'url': link}));
+    }
+  }
+
+  Widget _lockedSection(String title, IconData icon) {
+    return Card(
+      color: Colors.grey.shade100,
+      child: ListTile(
+        leading: Icon(icon, color: Colors.grey),
+        title: Text(title, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w700)),
+        subtitle: const Text('Pro feature. Tap to upgrade.'),
+        trailing: const Icon(Icons.lock, color: Colors.grey),
+        onTap: () => goUpgrade(context, '$title is available on the Pro plan.'),
+      ),
+    );
   }
 
   @override
@@ -296,8 +342,18 @@ class _VCardScreenState extends State<VCardScreen> {
                       trailing: IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => links.removeAt(e.key))),
                     )),
                 TextButton.icon(onPressed: _addLink, icon: const Icon(Icons.add), label: const Text('Add link')),
-              ] else
-                const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Links and products on the card come with the Pro plan.', style: TextStyle(color: Colors.black54))),
+                const Text('Products', style: TextStyle(fontWeight: FontWeight.w700)),
+                ...products.asMap().entries.map((e) => ListTile(
+                      dense: true,
+                      title: Text(e.value['name'] ?? ''),
+                      subtitle: Text(e.value['price'] ?? ''),
+                      trailing: IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => products.removeAt(e.key))),
+                    )),
+                TextButton.icon(onPressed: _addProduct, icon: const Icon(Icons.add), label: const Text('Add product')),
+              ] else ...[
+                _lockedSection('Links on my card', Icons.link),
+                _lockedSection('Products on my card', Icons.shopping_bag_outlined),
+              ],
               if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
               BigButton('Save V-Card', busy: busy, onTap: _save),
             ]),

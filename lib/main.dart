@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'auth_screens.dart';
 import 'home.dart';
+import 'upgrade.dart';
 
 final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
 const Color kBrand = Color(0xFF0F766E);
@@ -14,6 +15,9 @@ Future<void> main() async {
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (r) => false,
     );
+  };
+  Api.onUpgrade = (m) {
+    navKey.currentState?.push(MaterialPageRoute(builder: (_) => UpgradeScreen(message: m)));
   };
   runApp(const NetworkMitraApp());
 }

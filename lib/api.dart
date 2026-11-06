@@ -19,6 +19,7 @@ class Api {
   static Map<String, dynamic>? user;
   static Map<String, dynamic>? plan;
   static void Function()? onUnauthorized;
+  static void Function(String message)? onUpgrade;
 
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
@@ -85,7 +86,42 @@ class Api {
       final cb = onUnauthorized;
       if (cb != null) cb();
     }
+    if (r.statusCode == 402) {
+      final cb = onUpgrade;
+      if (cb != null) cb(msg);
+    }
     throw ApiException(msg, code: code, status: r.statusCode);
+  }
+
+  static Future<dynamic> upload(String path, String field, String filePath, {Map<String, String>? fields}) async {
+    final req = http.MultipartRequest('POST', Uri.parse('$kBase/$path'));
+    final t = token;
+    if (t != null) {
+      req.headers['Authorization'] = 'Bearer $t';
+      req.headers['X-Auth-Token'] = t;
+    }
+    req.headers['Accept'] = 'application/json';
+    if (fields != null) req.fields.addAll(fields);
+    req.files.add(await http.MultipartFile.fromPath(field, filePath));
+    http.Response r;
+    try {
+      r = await http.Response.fromStream(await req.send());
+    } catch (_) {
+      throw ApiException('No internet connection. Please try again.', code: 'network');
+    }
+    dynamic j;
+    try {
+      j = jsonDecode(utf8.decode(r.bodyBytes));
+    } catch (_) {
+      throw ApiException('The server did not answer properly (${r.statusCode}).', status: r.statusCode);
+    }
+    if (j is Map && j['ok'] == true) return j['data'];
+    final msg = (j is Map && j['error'] != null) ? j['error'].toString() : 'Something went wrong.';
+    if (r.statusCode == 402) {
+      final cb = onUpgrade;
+      if (cb != null) cb(msg);
+    }
+    throw ApiException(msg, status: r.statusCode);
   }
 
   static Future<dynamic> get(String path, {Map<String, String>? query}) => call('GET', path, query: query);
