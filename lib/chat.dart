@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api.dart';
+import 'badge.dart';
 import 'widgets.dart';
 
 List<Map<String, dynamic>> asList(dynamic d) =>
@@ -50,6 +51,7 @@ class _ChatListPageState extends State<ChatListPage> with AutomaticKeepAliveClie
         error = null;
         loading = false;
       });
+      ChatBadge.refresh();
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
@@ -248,6 +250,7 @@ class _RequestsPageState extends State<RequestsPage> with AutomaticKeepAliveClie
       await Api.put('connections/${c['id']}', {'action': action});
       if (mounted) toast(context, action == 'accept' ? 'Connected.' : 'Request rejected.');
       _load();
+      ChatBadge.refresh();
     } on ApiException catch (e) {
       if (mounted) toast(context, e.message);
     }

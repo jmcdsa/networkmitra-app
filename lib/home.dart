@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:async';
 import 'api.dart';
+import 'badge.dart';
 import 'auth_screens.dart';
 import 'chat.dart';
 import 'clients.dart';
@@ -15,8 +17,29 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int tab = 0;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    ChatBadge.refresh();
+    _poll = Timer.periodic(const Duration(seconds: 15), (_) => ChatBadge.refresh());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) ChatBadge.refresh();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,10 +49,21 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab,
         onDestinationSelected: (i) => setState(() => tab = i),
-        destinations: const [
+        destinations: [
           NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.people_outline), label: 'Clients'),
-          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: 'Chats'),
+          NavigationDestination(
+            icon: ValueListenableBuilder<int>(
+              valueListenable: ChatBadge.count,
+              builder: (_, n, __) => Badge(
+                isLabelVisible: n > 0,
+                backgroundColor: Colors.red,
+                label: Text(n > 99 ? '99+' : '$n'),
+                child: const Icon(Icons.chat_bubble_outline),
+              ),
+            ),
+            label: 'Chats',
+          ),
           NavigationDestination(icon: Icon(Icons.menu_book_outlined), label: 'Learn'),
           NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
