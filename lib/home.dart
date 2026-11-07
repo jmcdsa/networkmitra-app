@@ -8,6 +8,7 @@ import 'chat.dart';
 import 'clients.dart';
 import 'more.dart';
 import 'notifications.dart';
+import 'push.dart';
 import 'upgrade.dart';
 import 'widgets.dart';
 
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ChatBadge.refresh();
+    PushService.start();
     _poll = Timer.periodic(const Duration(seconds: 15), (_) => ChatBadge.refresh());
   }
 
@@ -295,7 +297,7 @@ class _ProfileTabState extends State<ProfileTab> {
         label: const Text('Log out'),
         onPressed: () async {
           try {
-            await Api.post('auth/logout', {});
+            await Api.post('auth/logout', {'push_token': PushService.token ?? ''});
           } catch (_) {}
           await Api.setToken(null);
           if (!context.mounted) return;
