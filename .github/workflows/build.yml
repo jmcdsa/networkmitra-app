@@ -39,8 +39,16 @@ jobs:
       - name: Build the APK
         run: flutter build apk --release --build-number=${{ github.run_number }}
 
+      - name: Write signing information (to find update problems)
+        run: |
+          echo "Build number: ${{ github.run_number }}" > build/signing-info.txt
+          keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk >> build/signing-info.txt || true
+          cat build/signing-info.txt
+
       - name: Keep the APK for download
         uses: actions/upload-artifact@v4
         with:
           name: NetworkMitra-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/signing-info.txt
