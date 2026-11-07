@@ -6,7 +6,8 @@ import 'chat.dart' show asList;
 const Map<String, String> kFeatureNames = {
   'clients': 'Clients in CRM',
   'connections': 'Community connections',
-  'chat': 'Chat',
+  'chat': 'Chat messages',
+  'chat_files': 'Files and photos in chat',
   'calls': 'Calls',
   'posters': 'Posters',
   'templates': 'Templates',

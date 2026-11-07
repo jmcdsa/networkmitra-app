@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'badge.dart';
 import 'widgets.dart';
@@ -436,13 +439,65 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _sendPhoto() async {
+  Future<void> _attach() async {
     if (sending) return;
+    final what = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(leading: const Icon(Icons.photo_outlined), title: const Text('Photo from gallery'), onTap: () => Navigator.pop(ctx, 'gallery')),
+          ListTile(leading: const Icon(Icons.photo_camera_outlined), title: const Text('Take a photo'), onTap: () => Navigator.pop(ctx, 'camera')),
+          ListTile(leading: const Icon(Icons.insert_drive_file_outlined), title: const Text('File (PDF, Word, Excel, video...)'), onTap: () => Navigator.pop(ctx, 'file')),
+        ]),
+      ),
+    );
+    if (what == null) return;
+    String? path;
+    String name = '';
+    var isImage = false;
     try {
-      final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1280, imageQuality: 80);
-      if (x == null) return;
-      setState(() => sending = true);
-      final m = Map<String, dynamic>.from(await Api.upload('conversations/${widget.convId}/messages', 'photo', x.path, fields: {'body': ''}) as Map);
+      if (what == 'file') {
+        final r = await FilePicker.platform.pickFiles();
+        if (r == null || r.files.isEmpty || r.files.first.path == null) return;
+        path = r.files.first.path!;
+        name = r.files.first.name;
+        final ext = name.toLowerCase().split('.').last;
+        isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext);
+      } else {
+        final x = await ImagePicker().pickImage(source: what == 'camera' ? ImageSource.camera : ImageSource.gallery, maxWidth: 1600, imageQuality: 82);
+        if (x == null) return;
+        path = x.path;
+        name = x.name;
+        isImage = true;
+      }
+    } catch (_) {
+      if (mounted) toast(context, 'Could not open the file.');
+      return;
+    }
+    if (!mounted) return;
+    final cap = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isImage ? 'Send photo' : 'Send file'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            if (isImage) ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(File(path!), height: 220, fit: BoxFit.contain))
+            else ListTile(leading: const Icon(Icons.insert_drive_file, size: 36), title: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis)),
+            const SizedBox(height: 10),
+            TextField(controller: cap, maxLines: 3, minLines: 1, decoration: const InputDecoration(hintText: 'Add a message (optional)')),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => sending = true);
+    try {
+      final m = Map<String, dynamic>.from(await Api.upload('conversations/${widget.convId}/messages', isImage ? 'photo' : 'file', path!, fields: {'body': cap.text.trim()}) as Map);
       setState(() {
         if (!msgs.any((e) => e['id'] == m['id'])) msgs.add(m);
       });
@@ -450,10 +505,39 @@ class _ChatScreenState extends State<ChatScreen> {
     } on ApiException catch (e) {
       if (mounted) toast(context, e.message);
     } catch (_) {
-      if (mounted) toast(context, 'Could not send the photo.');
+      if (mounted) toast(context, 'Could not send. Please try again.');
     } finally {
       if (mounted) setState(() => sending = false);
     }
+  }
+
+  Future<void> _download(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (mounted) toast(context, 'Could not open the file.');
+    }
+  }
+
+  String _size(dynamic b) {
+    final n = (b is num) ? b.toInt() : 0;
+    if (n <= 0) return '';
+    if (n < 1024 * 1024) return '${(n / 1024).ceil()} KB';
+    return '${(n / 1048576).toStringAsFixed(1)} MB';
+  }
+
+  void _viewImage(String url) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          actions: [IconButton(icon: const Icon(Icons.download), tooltip: 'Download', onPressed: () => _download(url))],
+        ),
+        body: Center(child: InteractiveViewer(child: Image.network(url))),
+      ),
+    ));
   }
 
   Future<void> _block() async {
@@ -533,7 +617,25 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       if (!mine) Text(m['sender_name'].toString(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F766E))),
                       if (m['type'] == 'image' && m['file_url'] != null)
-                        Padding(padding: const EdgeInsets.only(bottom: 4), child: Image.network(m['file_url'].toString(), width: 220)),
+                        GestureDetector(
+                          onTap: () => _viewImage(m['file_url'].toString()),
+                          child: Padding(padding: const EdgeInsets.only(bottom: 4), child: Image.network(m['file_url'].toString(), width: 220)),
+                        ),
+                      if (m['type'] == 'file' && m['file_url'] != null)
+                        InkWell(
+                          onTap: () => _download(m['file_url'].toString()),
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.insert_drive_file, size: 32, color: Color(0xFF0F766E)),
+                              const SizedBox(width: 8),
+                              Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text((m['file_name'] ?? 'File').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                Text('${_size(m['file_size'])}  •  Tap to download', style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                              ])),
+                            ]),
+                          ),
+                        ),
                       if ((m['body'] ?? '').toString().isNotEmpty) Text(m['body'].toString()),
                       Text(fmtDate(m['created_at'] as String?), style: const TextStyle(fontSize: 10, color: Colors.black45)),
                     ]),
@@ -547,7 +649,7 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
             child: Row(children: [
-              IconButton(onPressed: sending ? null : _sendPhoto, icon: const Icon(Icons.image_outlined)),
+              IconButton(onPressed: sending ? null : _attach, icon: const Icon(Icons.attach_file)),
               Expanded(
                 child: TextField(
                   controller: text,
