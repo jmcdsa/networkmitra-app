@@ -34,6 +34,20 @@ jobs:
           mkdir -p ~/.android
           cp keystore/debug.keystore ~/.android/debug.keystore
 
+      - name: Use a newer Android API level for every plugin (fixes file_picker error)
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/compile-sdk.gradle <<'EOF'
+          allprojects {
+            afterEvaluate { p ->
+              def a = p.extensions.findByName('android')
+              if (a != null) {
+                a.compileSdkVersion(36)
+              }
+            }
+          }
+          EOF
+
       - run: flutter pub get
 
       - name: Build the APK
