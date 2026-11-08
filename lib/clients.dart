@@ -221,6 +221,45 @@ class _LeadScreenState extends State<LeadScreen> {
     }
   }
 
+  Future<void> _whatsapp(String num) async {
+    final c = TextEditingController();
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('WhatsApp to ${name.text.trim().isEmpty ? 'client' : name.text.trim()}'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TextField(controller: c, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(hintText: 'Write your message')),
+          const SizedBox(height: 6),
+          const Text('Open WhatsApp: opens your own WhatsApp with this message.\nSend automatically (Pro): sent from the NetworkMitra business number.', style: TextStyle(fontSize: 12)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 'open'), child: const Text('Open WhatsApp')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, 'api'), child: const Text('Send automatically')),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    final text = c.text.trim();
+    if (choice == 'open') {
+      final n = num.replaceAll('+', '');
+      await _launch('https://wa.me/$n${text.isEmpty ? '' : '?text=${Uri.encodeComponent(text)}'}');
+      return;
+    }
+    if (text.isEmpty) {
+      if (mounted) toast(context, 'Please write a message first.');
+      return;
+    }
+    try {
+      await Api.post('leads/${widget.leadId}/whatsapp', {'message': text});
+      if (mounted) toast(context, 'WhatsApp message sent.');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      // 402 (plan limit) already opens the upgrade page by itself.
+      if (e.status != 402) toast(context, e.code == 'wa_off' ? 'Automatic sending is not set up yet. Use "Open WhatsApp".' : e.message);
+    }
+  }
+
   Future<void> _launch(String url) async {
     try {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
@@ -248,7 +287,7 @@ class _LeadScreenState extends State<LeadScreen> {
                   child: Row(children: [
                     OutlinedButton.icon(onPressed: () => _launch('tel:$num'), icon: const Icon(Icons.call), label: const Text('Call')),
                     const SizedBox(width: 10),
-                    OutlinedButton.icon(onPressed: () => _launch('https://wa.me/${num.replaceAll('+', '')}'), icon: const Icon(Icons.chat), label: const Text('WhatsApp')),
+                    OutlinedButton.icon(onPressed: () => _whatsapp(num), icon: const Icon(Icons.chat), label: const Text('WhatsApp')),
                   ]),
                 ),
               field(city, 'City'),
