@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 import 'api.dart';
 import 'badge.dart';
+import 'call.dart';
 import 'auth_screens.dart';
 import 'chat.dart';
 import 'clients.dart';
@@ -21,6 +22,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int tab = 0;
   Timer? _poll;
+  Timer? _callPoll;
 
   @override
   void initState() {
@@ -29,18 +31,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     ChatBadge.refresh();
     PushService.start();
     _poll = Timer.periodic(const Duration(seconds: 15), (_) => ChatBadge.refresh());
+    CallWatcher.check();
+    _callPoll = Timer.periodic(const Duration(seconds: 3), (_) => CallWatcher.check());
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _callPoll?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) ChatBadge.refresh();
+    if (state == AppLifecycleState.resumed) {
+      ChatBadge.refresh();
+      CallWatcher.check();
+    }
   }
 
   @override
