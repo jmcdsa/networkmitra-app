@@ -2,13 +2,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'api.dart';
 import 'badge.dart';
+import 'call.dart';
+import 'ringer.dart';
 
 /// Phone alerts (push notifications) through Firebase.
 class PushService {
   static String? token;
   static bool _started = false;
 
-  static const FirebaseOptions _options = FirebaseOptions(
+  static const FirebaseOptions options = FirebaseOptions(
     apiKey: 'AIzaSyCK3rJgc43IRSPR2_YqnHNFo2bF2SITIjo',
     appId: '1:80496493924:android:3f56e49c221d1332a52671',
     messagingSenderId: '80496493924',
@@ -20,8 +22,9 @@ class PushService {
     if (_started) return;
     try {
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(options: _options);
+        await Firebase.initializeApp(options: options);
       }
+      FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
       final m = FirebaseMessaging.instance;
       await m.requestPermission();
       _started = true;
@@ -32,7 +35,10 @@ class PushService {
         _send();
       });
       // A message arriving while the app is open: update the red counting.
-      FirebaseMessaging.onMessage.listen((_) => ChatBadge.refresh());
+      FirebaseMessaging.onMessage.listen((msg) {
+        ChatBadge.refresh();
+        if (msg.data['type'] == 'call') CallWatcher.check();
+      });
     } catch (_) {
       // Push is a bonus. If it fails the app still works.
     }

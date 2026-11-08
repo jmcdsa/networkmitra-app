@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'ringer.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'api.dart';
@@ -30,6 +32,7 @@ class CallWatcher {
       final p = await Api.get('calls/pending');
       if (p != null && p['id'] != shownId) {
         shownId = p['id'] as int;
+        clearCallAlerts();
         final other = Map<String, dynamic>.from(p['other'] as Map);
         navKey.currentState?.push(MaterialPageRoute(
           builder: (_) => IncomingCallScreen(callId: p['id'] as int, userId: other['id'] as int, name: other['name'].toString(), video: p['type'] == 'video'),
@@ -60,6 +63,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   @override
   void initState() {
     super.initState();
+    FlutterRingtonePlayer().play(android: AndroidSounds.ringtone, ios: IosSounds.electronic, looping: true, volume: 1.0, asAlarm: false);
     _t = Timer.periodic(const Duration(seconds: 2), (_) async {
       HapticFeedback.heavyImpact();
       try {
@@ -74,6 +78,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
 
   @override
   void dispose() {
+    FlutterRingtonePlayer().stop();
     _t?.cancel();
     super.dispose();
   }
@@ -166,6 +171,9 @@ class _CallScreenState extends State<CallScreen> {
     super.initState();
     CallWatcher.inCall = true;
     _speaker = widget.video;
+    if (!widget.incoming) {
+      FlutterRingtonePlayer().play(android: AndroidSounds.notification, ios: IosSounds.electronic, looping: true, volume: 0.4, asAlarm: false);
+    }
     _start();
   }
 
@@ -248,6 +256,7 @@ class _CallScreenState extends State<CallScreen> {
   void _onConnected() {
     if (_connected) return;
     _connected = true;
+    FlutterRingtonePlayer().stop();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       _secs++;
       if (mounted) setState(() => _status = _fmt(_secs));
@@ -329,6 +338,7 @@ class _CallScreenState extends State<CallScreen> {
   Future<void> _finish(String message, {required bool tellServer}) async {
     if (_finished) return;
     _finished = true;
+    FlutterRingtonePlayer().stop();
     _poll?.cancel();
     _ticker?.cancel();
     if (tellServer && _callId != null) {
@@ -352,6 +362,7 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    FlutterRingtonePlayer().stop();
     _poll?.cancel();
     _ticker?.cancel();
     _localR.dispose();
