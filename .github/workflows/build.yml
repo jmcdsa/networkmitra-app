@@ -24,10 +24,41 @@ jobs:
       - name: Create the Android part of the project
         run: flutter create --platforms=android --org store.ftc4u --project-name networkmitra .
 
+      - name: Download Gradle ourselves, with retries (GitHub sometimes answers 504)
+        run: |
+          PROPS=android/gradle/wrapper/gradle-wrapper.properties
+          VER=$(grep distributionUrl $PROPS | sed -E 's/.*gradle-([0-9.]+)-(all|bin)\.zip.*/\1/')
+          echo "Gradle version: $VER"
+          OK=0
+          for round in 1 2 3 4 5 6; do
+            for URL in \
+              "https://services.gradle.org/distributions/gradle-$VER-all.zip" \
+              "https://downloads.gradle.org/distributions/gradle-$VER-all.zip" \
+              "https://mirrors.cloud.tencent.com/gradle/gradle-$VER-all.zip" \
+              "https://mirrors.huaweicloud.com/gradle/gradle-$VER-all.zip"; do
+              echo "Trying $URL"
+              if curl -fL --connect-timeout 20 --max-time 600 -o /tmp/gradle.zip "$URL" && unzip -tq /tmp/gradle.zip >/dev/null 2>&1; then
+                OK=1
+                break
+              fi
+              rm -f /tmp/gradle.zip
+            done
+            [ "$OK" = 1 ] && break
+            echo "All sources failed in round $round. Waiting 45 seconds..."
+            sleep 45
+          done
+          if [ "$OK" = 1 ]; then
+            sed -i 's#^distributionUrl=.*#distributionUrl=file\\:///tmp/gradle.zip#' $PROPS
+            grep distributionUrl $PROPS
+          else
+            echo "Could not download Gradle; the normal download will be tried."
+          fi
+
       - name: Allow internet and set the app name
         run: |
-          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n    <application#' android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"/>\n    <uses-permission android:name="android.permission.VIBRATE"/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n    <application#' android/app/src/main/AndroidManifest.xml
           sed -i 's#android:label="[^"]*"#android:label="NetworkMitra"#' android/app/src/main/AndroidManifest.xml
+          sed -i 's#<activity#<activity android:showWhenLocked="true" android:turnScreenOn="true"#' android/app/src/main/AndroidManifest.xml
 
       - name: Use the same signing key every time (so new APK installs over the old one)
         run: |
@@ -46,12 +77,29 @@ jobs:
               }
             }
           }
+          allprojects {
+            afterEvaluate { p ->
+              if (p.name == 'app') {
+                def a = p.extensions.findByName('android')
+                if (a != null) {
+                  a.compileOptions.coreLibraryDesugaringEnabled = true
+                }
+                p.dependencies.add('coreLibraryDesugaring', 'com.android.tools:desugar_jdk_libs:2.1.4')
+              }
+            }
+          }
           EOF
 
       - run: flutter pub get
 
       - name: Build the APK
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        run: |
+          for i in 1 2 3; do
+            flutter build apk --release --build-number=${{ github.run_number }} && exit 0
+            echo "Build failed (try $i of 3). Waiting, then trying again..."
+            sleep 60
+          done
+          exit 1
 
       - name: Write signing information (to find update problems)
         run: |
