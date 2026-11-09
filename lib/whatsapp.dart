@@ -7,8 +7,39 @@ import 'api.dart';
 import 'widgets.dart';
 
 /// Opens a chat in WhatsApp or WhatsApp Business (the person picks which one).
+/// Digits with country code. A 10 digit number gets the default country code (91 = India unless the admin changed it).
+Future<String> fullNumber(String raw) async {
+  var d = raw.replaceAll(RegExp(r'[^0-9]'), '');
+  d = d.replaceFirst(RegExp(r'^0+'), '');
+  if (d.length == 10) {
+    var cc = '91';
+    try {
+      final st = await Api.get('whatsapp/status');
+      final c = (st['country_code'] ?? '').toString().replaceAll(RegExp(r'[^0-9]'), '');
+      if (c.isNotEmpty) cc = c;
+    } catch (_) {}
+    d = cc + d;
+  }
+  return d;
+}
+
+/// Opens the client's chat in Telegram.
+Future<void> openTelegram(BuildContext context, String number) async {
+  final n = await fullNumber(number);
+  try {
+    final ok = await launchUrl(Uri.parse('tg://resolve?phone=$n'), mode: LaunchMode.externalApplication);
+    if (ok) return;
+  } catch (_) {}
+  try {
+    await launchUrl(Uri.parse('https://t.me/+$n'), mode: LaunchMode.externalApplication);
+  } catch (_) {
+    if (context.mounted) toast(context, 'Could not open Telegram. Is it installed?');
+  }
+}
+
 Future<void> openWhatsApp(BuildContext context, String number, String text) async {
-  final n = number.replaceAll(RegExp(r'[^0-9]'), '');
+  final n = await fullNumber(number);
+  if (!context.mounted) return;
   final sp = await SharedPreferences.getInstance();
   var which = sp.getString('wa_app');
   if (which == null && context.mounted) {
@@ -27,8 +58,9 @@ Future<void> openWhatsApp(BuildContext context, String number, String text) asyn
     await sp.setString('wa_app', which);
   }
   final url = 'https://wa.me/$n${text.isEmpty ? '' : '?text=${Uri.encodeComponent(text)}'}';
+  final direct = 'whatsapp://send?phone=$n${text.isEmpty ? '' : '&text=${Uri.encodeComponent(text)}'}';
   try {
-    await AndroidIntent(action: 'action_view', data: url, package: which).launch();
+    await AndroidIntent(action: 'action_view', data: direct, package: which).launch();
   } catch (_) {
     // That app is not installed: let the phone choose.
     try {

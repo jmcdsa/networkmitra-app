@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'widgets.dart';
+import 'upgrade.dart';
 import 'whatsapp.dart';
 
 class ClientsTab extends StatefulWidget {
@@ -223,6 +224,10 @@ class _LeadScreenState extends State<LeadScreen> {
   }
 
   Future<void> _whatsapp(String num) async {
+    if (!featureOn('social_open')) {
+      goUpgrade(context, 'WhatsApp and Telegram chat links are available on the Pro plan.');
+      return;
+    }
     final c = TextEditingController();
     final choice = await showDialog<String>(
       context: context,
@@ -284,10 +289,20 @@ class _LeadScreenState extends State<LeadScreen> {
               if (!isNew && num.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: Row(children: [
+                  child: Wrap(spacing: 10, runSpacing: 8, children: [
                     OutlinedButton.icon(onPressed: () => _launch('tel:$num'), icon: const Icon(Icons.call), label: const Text('Call')),
-                    const SizedBox(width: 10),
                     OutlinedButton.icon(onPressed: () => _whatsapp(num), icon: const Icon(Icons.chat), label: const Text('WhatsApp')),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        if (!featureOn('social_open')) {
+                          goUpgrade(context, 'WhatsApp and Telegram chat links are available on the Pro plan.');
+                        } else {
+                          openTelegram(context, num);
+                        }
+                      },
+                      icon: const Icon(Icons.send),
+                      label: const Text('Telegram'),
+                    ),
                   ]),
                 ),
               field(city, 'City'),
