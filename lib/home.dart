@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'whatsapp.dart';
+import 'social.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 import 'api.dart';
@@ -298,6 +299,15 @@ class _ProfileTabState extends State<ProfileTab> {
           title: const Text('Targets and sales'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TargetsScreen())),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.image_outlined, color: Color(0xFF0F766E)),
+          title: const Text('Posters and templates'),
+          subtitle: const Text('Share posters with your photo and ready messages'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SocialScreen())),
         ),
       ),
       Card(
