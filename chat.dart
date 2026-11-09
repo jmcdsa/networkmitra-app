@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'badge.dart';
+import 'call.dart';
 import 'widgets.dart';
 
 List<Map<String, dynamic>> asList(dynamic d) =>
@@ -17,10 +18,10 @@ class ChatHubTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const DefaultTabController(
-      length: 3,
+      length: 4,
       child: Column(children: [
-        TabBar(tabs: [Tab(text: 'Chats'), Tab(text: 'Community'), Tab(text: 'Requests')]),
-        Expanded(child: TabBarView(children: [ChatListPage(), CommunityPage(), RequestsPage()])),
+        TabBar(tabs: [Tab(text: 'Chats'), Tab(text: 'Calls'), Tab(text: 'Community'), Tab(text: 'Requests')]),
+        Expanded(child: TabBarView(children: [ChatListPage(), CallsPage(), CommunityPage(), RequestsPage()])),
       ]),
     );
   }
@@ -583,6 +584,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.title), actions: [
+        if (widget.otherUserId != null)
+          IconButton(icon: const Icon(Icons.call), tooltip: 'Audio call', onPressed: () => startCall(context, widget.otherUserId!, widget.title, false)),
+        if (widget.otherUserId != null)
+          IconButton(icon: const Icon(Icons.videocam), tooltip: 'Video call', onPressed: () => startCall(context, widget.otherUserId!, widget.title, true)),
         if (widget.otherUserId != null)
           PopupMenuButton<String>(
             onSelected: (v) => v == 'block' ? _block() : _report(null),

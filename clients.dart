@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'widgets.dart';
+import 'upgrade.dart';
+import 'whatsapp.dart';
 
 class ClientsTab extends StatefulWidget {
   const ClientsTab({super.key});
@@ -221,6 +223,48 @@ class _LeadScreenState extends State<LeadScreen> {
     }
   }
 
+  Future<void> _whatsapp(String num) async {
+    if (!featureOn('social_open')) {
+      goUpgrade(context, 'WhatsApp and Telegram chat links are available on the Pro plan.');
+      return;
+    }
+    final c = TextEditingController();
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('WhatsApp to ${name.text.trim().isEmpty ? 'client' : name.text.trim()}'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TextField(controller: c, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(hintText: 'Write your message')),
+          const SizedBox(height: 6),
+          const Text('Open WhatsApp: opens your own WhatsApp with this message.\nSend automatically (Pro): sent from your own WhatsApp Business API (Profile > My WhatsApp API).', style: TextStyle(fontSize: 12)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, 'open'), child: const Text('Open WhatsApp')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, 'api'), child: const Text('Send automatically')),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    final text = c.text.trim();
+    if (choice == 'open') {
+      await openWhatsApp(context, num, text);
+      return;
+    }
+    if (text.isEmpty) {
+      if (mounted) toast(context, 'Please write a message first.');
+      return;
+    }
+    try {
+      await Api.post('leads/${widget.leadId}/whatsapp', {'message': text});
+      if (mounted) toast(context, 'WhatsApp message sent.');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      // 402 (plan limit) already opens the upgrade page by itself.
+      if (e.status != 402) toast(context, e.code == 'wa_not_setup' ? 'First add your WhatsApp API: Profile > My WhatsApp API.' : (e.code == 'wa_off' ? 'Automatic sending is switched off for now. Use "Open WhatsApp".' : e.message));
+    }
+  }
+
   Future<void> _launch(String url) async {
     try {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
@@ -245,10 +289,20 @@ class _LeadScreenState extends State<LeadScreen> {
               if (!isNew && num.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: Row(children: [
+                  child: Wrap(spacing: 10, runSpacing: 8, children: [
                     OutlinedButton.icon(onPressed: () => _launch('tel:$num'), icon: const Icon(Icons.call), label: const Text('Call')),
-                    const SizedBox(width: 10),
-                    OutlinedButton.icon(onPressed: () => _launch('https://wa.me/${num.replaceAll('+', '')}'), icon: const Icon(Icons.chat), label: const Text('WhatsApp')),
+                    OutlinedButton.icon(onPressed: () => _whatsapp(num), icon: const Icon(Icons.chat), label: const Text('WhatsApp')),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        if (!featureOn('social_open')) {
+                          goUpgrade(context, 'WhatsApp and Telegram chat links are available on the Pro plan.');
+                        } else {
+                          openTelegram(context, num);
+                        }
+                      },
+                      icon: const Icon(Icons.send),
+                      label: const Text('Telegram'),
+                    ),
                   ]),
                 ),
               field(city, 'City'),

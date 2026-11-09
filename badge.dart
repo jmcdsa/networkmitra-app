@@ -13,7 +13,9 @@ class ChatBadge {
         n += ((c as Map)['unread'] ?? 0) as int;
       }
       final req = await Api.get('connections', query: {'status': 'incoming'}) as List;
-      count.value = n + req.length;
+      final calls = await Api.get('calls');
+      final missed = ((calls as Map)['missed_unseen'] ?? 0) as int;
+      count.value = n + req.length + missed;
     } catch (_) {
       // keep the old number if the phone is offline
     }
