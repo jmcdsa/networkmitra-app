@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'widgets.dart';
+import 'whatsapp.dart';
 
 class ClientsTab extends StatefulWidget {
   const ClientsTab({super.key});
@@ -230,7 +231,7 @@ class _LeadScreenState extends State<LeadScreen> {
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           TextField(controller: c, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(hintText: 'Write your message')),
           const SizedBox(height: 6),
-          const Text('Open WhatsApp: opens your own WhatsApp with this message.\nSend automatically (Pro): sent from the NetworkMitra business number.', style: TextStyle(fontSize: 12)),
+          const Text('Open WhatsApp: opens your own WhatsApp with this message.\nSend automatically (Pro): sent from your own WhatsApp Business API (Profile > My WhatsApp API).', style: TextStyle(fontSize: 12)),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -242,8 +243,7 @@ class _LeadScreenState extends State<LeadScreen> {
     if (choice == null) return;
     final text = c.text.trim();
     if (choice == 'open') {
-      final n = num.replaceAll('+', '');
-      await _launch('https://wa.me/$n${text.isEmpty ? '' : '?text=${Uri.encodeComponent(text)}'}');
+      await openWhatsApp(context, num, text);
       return;
     }
     if (text.isEmpty) {
@@ -256,7 +256,7 @@ class _LeadScreenState extends State<LeadScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       // 402 (plan limit) already opens the upgrade page by itself.
-      if (e.status != 402) toast(context, e.code == 'wa_off' ? 'Automatic sending is not set up yet. Use "Open WhatsApp".' : e.message);
+      if (e.status != 402) toast(context, e.code == 'wa_not_setup' ? 'First add your WhatsApp API: Profile > My WhatsApp API.' : (e.code == 'wa_off' ? 'Automatic sending is switched off for now. Use "Open WhatsApp".' : e.message));
     }
   }
 

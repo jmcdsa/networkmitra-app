@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'whatsapp.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 import 'api.dart';
@@ -297,6 +298,15 @@ class _ProfileTabState extends State<ProfileTab> {
           title: const Text('Targets and sales'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TargetsScreen())),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.chat_outlined, color: Color(0xFF0F766E)),
+          title: const Text('My WhatsApp API'),
+          subtitle: const Text('Send WhatsApp messages automatically'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WaSetupScreen())),
         ),
       ),
       const SizedBox(height: 16),
