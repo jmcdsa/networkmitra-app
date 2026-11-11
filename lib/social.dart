@@ -526,6 +526,54 @@ class _ArtPainter extends CustomPainter {
   bool shouldRepaint(covariant _ArtPainter old) => old.theme != theme;
 }
 
+/// A text-free picture from the owner with the day's message written on it: first half white, second half gold.
+class _PosterPhoto extends StatelessWidget {
+  final String url;
+  final String text;
+  const _PosterPhoto({required this.url, required this.text});
+  @override
+  Widget build(BuildContext context) {
+    final words = text.trim().split(RegExp(r'\s+'));
+    final cut = (words.length / 2).ceil();
+    final first = words.take(cut).join(' ');
+    final rest = words.skip(cut).join(' ');
+    const shadow = [Shadow(blurRadius: 8, color: Colors.black87)];
+    return AspectRatio(
+      aspectRatio: 4 / 5,
+      child: Stack(fit: StackFit.expand, children: [
+        Image.network(url, fit: BoxFit.cover,
+            loadingBuilder: (c, w, p) => p == null ? w : const Center(child: CircularProgressIndicator()),
+            errorBuilder: (_, __, ___) => Container(color: const Color(0xFF14284B))),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, stops: [0.0, 0.45, 1.0], colors: [Colors.transparent, Color(0x66000000), Color(0xE60B1B3A)]),
+          ),
+        ),
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: 96,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: '$first ', style: const TextStyle(color: Colors.white)),
+                  TextSpan(text: rest, style: const TextStyle(color: Color(0xFFFFD54F))),
+                ]),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 26, height: 1.35, fontWeight: FontWeight.w800, shadows: shadow),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
 class _PosterArt extends StatelessWidget {
   final String text;
   final String emoji;
@@ -573,6 +621,7 @@ class _TodayTab extends StatefulWidget {
 class _TodayTabState extends State<_TodayTab> with AutomaticKeepAliveClientMixin {
   Map<String, dynamic>? quote;
   int theme = 0;
+  String? bgUrl;
   bool loading = true;
   String? error;
   String lang = 'en';
@@ -590,6 +639,7 @@ class _TodayTabState extends State<_TodayTab> with AutomaticKeepAliveClientMixin
     try {
       final d = await Api.get('daily');
       theme = (d['theme'] as int?) ?? 0;
+      bgUrl = d['bg_url']?.toString();
       if (d['quote'] != null) {
         quote = Map<String, dynamic>.from(d['quote'] as Map);
         lang = quote!['text_en'].toString().isNotEmpty ? 'en' : 'hi';
@@ -629,7 +679,9 @@ class _TodayTabState extends State<_TodayTab> with AutomaticKeepAliveClientMixin
           key: ValueKey('today$lang'),
           usePath: 'daily/use',
           fileTag: 'today',
-          background: _PosterArt(text: text, emoji: _emojiFor(quote!['text_en'].toString(), theme), theme: theme),
+          background: bgUrl != null && bgUrl!.isNotEmpty
+              ? _PosterPhoto(url: bgUrl!, text: text)
+              : _PosterArt(text: text, emoji: _emojiFor(quote!['text_en'].toString(), theme), theme: theme),
         ),
       ]),
     );

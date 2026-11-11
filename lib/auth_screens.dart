@@ -238,7 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: ListView(padding: const EdgeInsets.all(20), children: [
           field(name, 'Full name'),
           field(email, 'Email', type: TextInputType.emailAddress),
-          field(mobile, 'Mobile number', type: TextInputType.phone),
+          PhoneField(controller: mobile),
           field(pass, 'Password (8 or more letters)', secret: true),
           field(city, 'City (optional)'),
           InkWell(

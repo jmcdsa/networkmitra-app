@@ -285,7 +285,7 @@ class _LeadScreenState extends State<LeadScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(padding: const EdgeInsets.all(20), children: [
               field(name, 'Name'),
-              field(mobile, 'Mobile number', type: TextInputType.phone),
+              PhoneField(controller: mobile),
               if (!isNew && num.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
