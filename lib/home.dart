@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[const DashboardTab(), const ClientsTab(), const ChatHubTab(), const KbTab(), const ProfileTab()];
+    final pages = <Widget>[const DashboardTab(), const ClientsTab(), const ChatHubTab(), const KbTab(), const SocialScreen(), const ProfileTab()];
     return Scaffold(
       body: SafeArea(child: pages[tab]),
       bottomNavigationBar: NavigationBar(
@@ -77,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             label: 'Chats',
           ),
           NavigationDestination(icon: Icon(Icons.menu_book_outlined), label: 'Learn'),
+          NavigationDestination(icon: Icon(Icons.image_outlined), label: 'Posters'),
           NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
       ),
@@ -299,15 +300,6 @@ class _ProfileTabState extends State<ProfileTab> {
           title: const Text('Targets and sales'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TargetsScreen())),
-        ),
-      ),
-      Card(
-        child: ListTile(
-          leading: const Icon(Icons.image_outlined, color: Color(0xFF0F766E)),
-          title: const Text('Posters and templates'),
-          subtitle: const Text('Share posters with your photo and ready messages'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SocialScreen())),
         ),
       ),
       Card(

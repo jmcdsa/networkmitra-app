@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,6 +8,7 @@ import 'api.dart';
 import 'chat.dart' show asList;
 import 'poster_editor.dart';
 import 'upgrade.dart';
+import 'videos.dart';
 import 'widgets.dart';
 
 /// Posters and ready message templates.
@@ -15,13 +17,13 @@ class SocialScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Posters and templates'),
-          bottom: const TabBar(tabs: [Tab(text: 'Today'), Tab(text: 'Posters'), Tab(text: 'Templates')]),
+          title: const Text('Posters, templates, videos'),
+          bottom: const TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [Tab(text: 'Today'), Tab(text: 'Posters'), Tab(text: 'Templates'), Tab(text: 'Videos')]),
         ),
-        body: const TabBarView(children: [_TodayTab(), _PostersTab(), _TemplatesTab()]),
+        body: const TabBarView(children: [_TodayTab(), _PostersTab(), _TemplatesTab(), VideosTab()]),
       ),
     );
   }
@@ -441,13 +443,125 @@ class _TemplateScreenState extends State<TemplateScreen> {
 }
 
 const List<List<Color>> _themes = [
-  [Color(0xFF0F766E), Color(0xFF134E4A)],
-  [Color(0xFF7C3AED), Color(0xFF4C1D95)],
-  [Color(0xFFEA580C), Color(0xFF9A3412)],
-  [Color(0xFF2563EB), Color(0xFF1E3A8A)],
-  [Color(0xFFBE185D), Color(0xFF831843)],
-  [Color(0xFF15803D), Color(0xFF14532D)],
+  [Color(0xFFFF9A3C), Color(0xFFE0245E)], // sunrise
+  [Color(0xFF7F5AF0), Color(0xFF2CB1BC)], // purple to teal
+  [Color(0xFF11998E), Color(0xFF38EF7D)], // fresh green
+  [Color(0xFF1E3C72), Color(0xFF2A9DF4)], // deep blue
+  [Color(0xFFF7971E), Color(0xFFFF512F)], // fire
+  [Color(0xFFB24592), Color(0xFFF15F79)], // pink
 ];
+
+/// A picture that fits the message: picks an emoji from the words of the message.
+String _emojiFor(String en, int day) {
+  final t = en.toLowerCase();
+  const map = <String, String>{
+    'call': '\u{1F4DE}', 'phone': '\u{1F4DE}', 'listen': '\u{1F442}', 'smile': '\u{1F60A}',
+    'trust': '\u{1F91D}', 'honest': '\u{1F91D}', 'respect': '\u{1F91D}', 'help': '\u{1F91D}', 'network': '\u{1F310}', 'team': '\u{1F465}', 'lead': '\u{1F451}',
+    'dream': '\u{1F680}', 'big': '\u{1F680}', 'start': '\u{1F680}', 'today': '\u{1F305}', 'morning': '\u{1F305}',
+    'target': '\u{1F3AF}', 'plan': '\u{1F3AF}', 'goal': '\u{1F3AF}', 'health': '\u{1F4AA}', 'hard work': '\u{1F4AA}', 'quit': '\u{1F4AA}', 'never': '\u{1F4AA}',
+    'learn': '\u{1F4DA}', 'expert': '\u{1F4DA}', 'beginner': '\u{1F4DA}', 'tree': '\u{1F333}', 'patient': '\u{1F331}', 'grow': '\u{1F331}',
+    'thank': '\u{1F64F}', 'success': '\u{1F3C6}', 'win': '\u{1F3C6}', 'best': '\u{1F3C6}', 'story': '\u{2728}', 'believe': '\u{1F4A1}', 'attitude': '\u{1F4A1}',
+    'saving': '\u{1F4B0}', 'worth': '\u{1F4B0}', 'income': '\u{1F4B0}', 'consisten': '\u{1F525}', 'every day': '\u{1F525}',
+  };
+  for (final e in map.entries) {
+    if (t.contains(e.key)) return e.value;
+  }
+  const fallback = ['\u{2B50}', '\u{1F31F}', '\u{1F389}', '\u{1F308}', '\u{1F4AB}', '\u{1F33B}'];
+  return fallback[day % fallback.length];
+}
+
+/// Soft shapes drawn on the poster: rays, circles and hills, different for each theme.
+class _ArtPainter extends CustomPainter {
+  final int theme;
+  _ArtPainter(this.theme);
+  @override
+  void paint(Canvas c, Size s) {
+    final p = Paint();
+    final style = theme % 3;
+    if (style == 0) {
+      // sunburst rays from the top middle
+      p.color = Colors.white.withOpacity(0.10);
+      final centre = Offset(s.width / 2, s.height * 0.18);
+      for (int i = 0; i < 12; i++) {
+        final a1 = (i * 30) * math.pi / 180, a2 = (i * 30 + 14) * math.pi / 180;
+        final path = Path()
+          ..moveTo(centre.dx, centre.dy)
+          ..lineTo(centre.dx + math.cos(a1) * s.width * 1.5, centre.dy + math.sin(a1) * s.width * 1.5)
+          ..lineTo(centre.dx + math.cos(a2) * s.width * 1.5, centre.dy + math.sin(a2) * s.width * 1.5)
+          ..close();
+        c.drawPath(path, p);
+      }
+    } else if (style == 1) {
+      // big soft circles
+      p.color = Colors.white.withOpacity(0.12);
+      c.drawCircle(Offset(s.width * 0.88, s.height * 0.12), s.width * 0.28, p);
+      p.color = Colors.white.withOpacity(0.08);
+      c.drawCircle(Offset(s.width * 0.08, s.height * 0.78), s.width * 0.34, p);
+      p.color = Colors.white.withOpacity(0.10);
+      c.drawCircle(Offset(s.width * 0.55, s.height * 1.02), s.width * 0.3, p);
+    } else {
+      // dots pattern
+      p.color = Colors.white.withOpacity(0.13);
+      for (double x = 14; x < s.width; x += 34) {
+        for (double y = 14; y < s.height; y += 34) {
+          c.drawCircle(Offset(x, y), 2.2, p);
+        }
+      }
+    }
+    // hills at the bottom for every style
+    final hill = Path()
+      ..moveTo(0, s.height)
+      ..lineTo(0, s.height * 0.86)
+      ..quadraticBezierTo(s.width * 0.25, s.height * 0.76, s.width * 0.5, s.height * 0.87)
+      ..quadraticBezierTo(s.width * 0.78, s.height * 0.98, s.width, s.height * 0.84)
+      ..lineTo(s.width, s.height)
+      ..close();
+    c.drawPath(hill, Paint()..color = Colors.black.withOpacity(0.14));
+    // thin frame
+    c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(12, 12, s.width - 24, s.height - 24), const Radius.circular(18)),
+        Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = Colors.white.withOpacity(0.35));
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArtPainter old) => old.theme != theme;
+}
+
+class _PosterArt extends StatelessWidget {
+  final String text;
+  final String emoji;
+  final int theme;
+  const _PosterArt({required this.text, required this.emoji, required this.theme});
+  @override
+  Widget build(BuildContext context) {
+    final colors = _themes[theme % _themes.length];
+    return AspectRatio(
+      aspectRatio: 1,
+      child: Container(
+        decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors)),
+        child: CustomPaint(
+          painter: _ArtPainter(theme),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(30, 30, 30, 42),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(emoji, style: const TextStyle(fontSize: 64)),
+              const SizedBox(height: 14),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 300),
+                    child: Text(text, textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 24, height: 1.4, fontWeight: FontWeight.w700, shadows: [Shadow(blurRadius: 6, color: Colors.black38)])),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// A new ready poster every day, made automatically. Nothing for the owner to upload.
 class _TodayTab extends StatefulWidget {
@@ -495,7 +609,6 @@ class _TodayTabState extends State<_TodayTab> with AutomaticKeepAliveClientMixin
     if (quote == null) return const Center(child: Text('Today\'s poster is not ready yet.'));
     final both = quote!['text_en'].toString().isNotEmpty && quote!['text_hi'].toString().isNotEmpty;
     final text = quote![lang == 'hi' ? 'text_hi' : 'text_en'].toString();
-    final colors = _themes[theme % _themes.length];
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.all(16), children: [
@@ -516,14 +629,7 @@ class _TodayTabState extends State<_TodayTab> with AutomaticKeepAliveClientMixin
           key: ValueKey('today$lang'),
           usePath: 'daily/use',
           fileTag: 'today',
-          background: AspectRatio(
-            aspectRatio: 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 26),
-              decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors)),
-              child: Center(child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, height: 1.4, fontWeight: FontWeight.w600))),
-            ),
-          ),
+          background: _PosterArt(text: text, emoji: _emojiFor(quote!['text_en'].toString(), theme), theme: theme),
         ),
       ]),
     );
