@@ -11,6 +11,7 @@ const Map<String, String> kFeatureNames = {
   'connections': 'Community connections',
   'chat': 'Chat messages',
   'chat_files': 'Files and photos in chat',
+  'lead_search': 'Find leads on Google',
   'video_post': 'Share experience videos',
   'poster_edit': 'Poster editing (photo, logo, layout)',
   'template_links': 'Own templates: links and longer text',

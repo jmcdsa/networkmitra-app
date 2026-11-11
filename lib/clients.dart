@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
+import 'lead_finder.dart';
 import 'widgets.dart';
 import 'upgrade.dart';
 import 'whatsapp.dart';
@@ -50,7 +51,23 @@ class _ClientsTabState extends State<ClientsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _open(), icon: const Icon(Icons.add), label: const Text('Add client')),
+      floatingActionButton: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+        FloatingActionButton.extended(
+          heroTag: 'find',
+          backgroundColor: Colors.white,
+          onPressed: () {
+            if (!featureOn('lead_search')) {
+              goUpgrade(context, 'Finding new leads on Google is available on the Pro plan.');
+            } else {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LeadFinderScreen())).then((_) => _load());
+            }
+          },
+          icon: const Icon(Icons.travel_explore),
+          label: const Text('Find leads'),
+        ),
+        const SizedBox(height: 10),
+        FloatingActionButton.extended(heroTag: 'add', onPressed: () => _open(), icon: const Icon(Icons.add), label: const Text('Add client')),
+      ]),
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
