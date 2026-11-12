@@ -36,6 +36,8 @@ class NetworkMitraApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: kBrand),
         inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
       ),
+      // Keeps every screen out of the phone's bottom navigation bar (the top is handled by each screen's own app bar / SafeArea).
+      builder: (context, child) => SafeArea(top: false, child: child ?? const SizedBox()),
       home: const Splash(),
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'upgrade.dart';
@@ -174,6 +176,7 @@ class _VCardScreenState extends State<VCardScreen> {
   final phone = TextEditingController();
   final whatsapp = TextEditingController();
   final email = TextEditingController();
+  String? catalogueUrl;
   String? shareUrl;
   bool isPublic = true;
   bool full = false;
@@ -196,10 +199,11 @@ class _VCardScreenState extends State<VCardScreen> {
     whatsapp.text = (v['whatsapp'] ?? '').toString();
     email.text = (v['email'] ?? '').toString();
     shareUrl = v['share_url'] as String?;
+    catalogueUrl = v['catalogue_url'] as String?;
     isPublic = v['is_public'] == true;
     full = v['is_full_card'] == true;
     links = ((v['social_links'] ?? []) as List).map((e) => {'label': '${(e as Map)['label']}', 'url': '${e['url']}'}).toList();
-    products = ((v['products'] ?? []) as List).map((e) => {'name': '${(e as Map)['name']}', 'price': '${e['price'] ?? ''}', 'url': '${e['url'] ?? ''}'}).toList();
+    products = ((v['products'] ?? []) as List).map((e) => {'name': '${(e as Map)['name']}', 'price': '${e['price'] ?? ''}', 'url': '${e['url'] ?? ''}', 'image': '${e['image'] ?? ''}', 'image_url': '${e['image_url'] ?? ''}'}).toList();
   }
 
   Future<void> _load() async {
@@ -266,27 +270,89 @@ class _VCardScreenState extends State<VCardScreen> {
     final n = TextEditingController();
     final pr = TextEditingController();
     final u = TextEditingController(text: 'https://');
+    String image = '', imageUrl = '';
+    bool uploading = false;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add a product'),
-        content: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            field(n, 'Product name'),
-            field(pr, 'Price (optional)'),
-            field(u, 'Link (optional)', type: TextInputType.url),
-          ]),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Add a product'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              if (imageUrl.isNotEmpty)
+                ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(imageUrl, height: 120, width: 120, fit: BoxFit.cover)),
+              TextButton.icon(
+                onPressed: uploading
+                    ? null
+                    : () async {
+                        try {
+                          final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 85);
+                          if (x == null) return;
+                          setD(() => uploading = true);
+                          final d = await Api.upload('vcard/product-image', 'image', x.path);
+                          setD(() {
+                            image = '${d['image']}';
+                            imageUrl = '${d['image_url']}';
+                          });
+                        } on ApiException catch (e) {
+                          if (ctx.mounted && e.status != 402) toast(ctx, e.message);
+                        } catch (_) {
+                          if (ctx.mounted) toast(ctx, 'Could not use this picture.');
+                        }
+                        setD(() => uploading = false);
+                      },
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+                label: Text(uploading ? 'Uploading...' : (image.isEmpty ? 'Add product picture' : 'Change picture')),
+              ),
+              field(n, 'Product name'),
+              field(pr, 'Price (optional)'),
+              field(u, 'Link (optional)', type: TextInputType.url),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: uploading ? null : () => Navigator.pop(ctx, true), child: const Text('Add')),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Add')),
-        ],
       ),
     );
     if (ok == true && n.text.trim().isNotEmpty) {
       final link = u.text.trim() == 'https://' ? '' : u.text.trim();
-      setState(() => products.add({'name': n.text.trim(), 'price': pr.text.trim(), 'url': link}));
+      setState(() => products.add({'name': n.text.trim(), 'price': pr.text.trim(), 'url': link, 'image': image, 'image_url': imageUrl}));
     }
+  }
+
+  Widget _linkCard(String url, String subtitle) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(url, style: const TextStyle(fontSize: 14)),
+          Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 8, runSpacing: 4, children: [
+            OutlinedButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: url));
+                if (mounted) toast(context, 'Link copied.');
+              },
+              icon: const Icon(Icons.copy, size: 18),
+              label: const Text('Copy'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => Share.share(url),
+              icon: const Icon(Icons.share, size: 18),
+              label: const Text('Share'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => openUrl(context, url),
+              icon: const Icon(Icons.visibility_outlined, size: 18),
+              label: const Text('Preview'),
+            ),
+          ]),
+        ]),
+      ),
+    );
   }
 
   Widget _lockedSection(String title, IconData icon) {
@@ -309,23 +375,8 @@ class _VCardScreenState extends State<VCardScreen> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(padding: const EdgeInsets.all(20), children: [
-              if (shareUrl != null)
-                Card(
-                  child: ListTile(
-                    title: Text(shareUrl!, style: const TextStyle(fontSize: 14)),
-                    subtitle: const Text('Your card link. Share it with clients.'),
-                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      IconButton(
-                        icon: const Icon(Icons.copy),
-                        onPressed: () async {
-                          await Clipboard.setData(ClipboardData(text: shareUrl!));
-                          if (context.mounted) toast(context, 'Link copied.');
-                        },
-                      ),
-                      IconButton(icon: const Icon(Icons.open_in_new), onPressed: () => openUrl(context, shareUrl!)),
-                    ]),
-                  ),
-                ),
+              if (shareUrl != null) _linkCard(shareUrl!, 'Your card link. Share it with clients.'),
+              if (full && catalogueUrl != null && products.isNotEmpty) _linkCard(catalogueUrl!, 'Your product catalogue link. Share it on WhatsApp, Facebook, Instagram or anywhere.'),
               const SizedBox(height: 10),
               field(username, 'Card name in link (small letters, numbers)'),
               field(bio, 'About me', lines: 3),
@@ -345,6 +396,9 @@ class _VCardScreenState extends State<VCardScreen> {
                 const Text('Products', style: TextStyle(fontWeight: FontWeight.w700)),
                 ...products.asMap().entries.map((e) => ListTile(
                       dense: true,
+                      leading: (e.value['image_url'] ?? '').isNotEmpty
+                          ? ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.network(e.value['image_url']!, width: 44, height: 44, fit: BoxFit.cover))
+                          : const Icon(Icons.image_outlined),
                       title: Text(e.value['name'] ?? ''),
                       subtitle: Text(e.value['price'] ?? ''),
                       trailing: IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => products.removeAt(e.key))),
