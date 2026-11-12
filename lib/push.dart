@@ -3,6 +3,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'api.dart';
 import 'badge.dart';
 import 'call.dart';
+import 'chat.dart';
+import 'main.dart' show navKey;
 import 'ringer.dart';
 
 /// Phone alerts (push notifications) through Firebase.
@@ -39,9 +41,35 @@ class PushService {
         ChatBadge.refresh();
         if (msg.data['type'] == 'call') CallWatcher.check();
       });
+      // The person taps an alert: open the right chat or the call screen.
+      FirebaseMessaging.onMessageOpenedApp.listen(_opened);
+      final first = await m.getInitialMessage();
+      if (first != null) {
+        Future.delayed(const Duration(milliseconds: 1500), () => _opened(first));
+      }
     } catch (_) {
       // Push is a bonus. If it fails the app still works.
     }
+  }
+
+  static Future<void> _opened(RemoteMessage msg) async {
+    if (Api.token == null) return;
+    final type = msg.data['type'];
+    try {
+      if (type == 'call') {
+        CallWatcher.check();
+      } else if (type == 'message') {
+        final id = int.tryParse((msg.data['conversation_id'] ?? '').toString());
+        if (id == null) return;
+        final list = asList(await Api.get('conversations'));
+        final c = list.where((e) => e['id'] == id).toList();
+        if (c.isEmpty) return;
+        final other = c.first['other_user'] is Map ? (c.first['other_user'] as Map)['id'] as int? : null;
+        navKey.currentState?.push(MaterialPageRoute(
+          builder: (_) => ChatScreen(convId: id, title: c.first['title'].toString(), otherUserId: other),
+        ));
+      }
+    } catch (_) {}
   }
 
   static Future<void> _send() async {
