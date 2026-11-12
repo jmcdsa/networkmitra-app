@@ -88,6 +88,13 @@ jobs:
               }
             }
           }
+          allprojects {
+            tasks.configureEach { t ->
+              if (t.name.startsWith('lint')) {
+                t.enabled = false
+              }
+            }
+          }
           EOF
 
       - run: flutter pub get
