@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'lead_finder.dart';
+import 'pool_leads.dart';
 import 'widgets.dart';
 import 'upgrade.dart';
 import 'whatsapp.dart';
@@ -52,6 +53,20 @@ class _ClientsTabState extends State<ClientsTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+        FloatingActionButton.extended(
+          heroTag: 'pool',
+          backgroundColor: Colors.white,
+          onPressed: () {
+            if (!featureOn('pool_leads')) {
+              goUpgrade(context, 'Free daily leads are available on the Pro plan.');
+            } else {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PoolLeadsScreen())).then((_) => _load());
+            }
+          },
+          icon: const Icon(Icons.card_giftcard),
+          label: const Text('Free leads'),
+        ),
+        const SizedBox(height: 10),
         FloatingActionButton.extended(
           heroTag: 'find',
           backgroundColor: Colors.white,
