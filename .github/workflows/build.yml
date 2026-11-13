@@ -58,6 +58,8 @@ jobs:
         run: |
           sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"/>\n    <uses-permission android:name="android.permission.VIBRATE"/>\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n    <application#' android/app/src/main/AndroidManifest.xml
           sed -i 's#android:label="[^"]*"#android:label="NetworkMitra"#' android/app/src/main/AndroidManifest.xml
+          ADMOB=$(tr -d ' \r\n' < admob_app_id.txt)
+          sed -i "s#</application>#<meta-data android:name=\"com.google.android.gms.ads.APPLICATION_ID\" android:value=\"$ADMOB\"/>\n    </application>#" android/app/src/main/AndroidManifest.xml
           sed -i 's#<activity#<activity android:showWhenLocked="true" android:turnScreenOn="true"#' android/app/src/main/AndroidManifest.xml
 
       - name: Use the same signing key every time (so new APK installs over the old one)
@@ -83,6 +85,7 @@ jobs:
                 def a = p.extensions.findByName('android')
                 if (a != null) {
                   a.compileOptions.coreLibraryDesugaringEnabled = true
+                  a.defaultConfig.minSdkVersion(24)
                 }
                 p.dependencies.add('coreLibraryDesugaring', 'com.android.tools:desugar_jdk_libs:2.1.4')
               }
@@ -102,7 +105,7 @@ jobs:
       - name: Build the APK
         run: |
           for i in 1 2 3; do
-            flutter build apk --release --build-number=${{ github.run_number }} && exit 0
+            flutter build apk --release --build-number=$(date +%s) && exit 0
             echo "Build failed (try $i of 3). Waiting, then trying again..."
             sleep 60
           done
@@ -110,7 +113,7 @@ jobs:
 
       - name: Write signing information (to find update problems)
         run: |
-          echo "Build number: ${{ github.run_number }}" > build/signing-info.txt
+          echo "Build number (version code): $(date +%s) / run ${{ github.run_number }}" > build/signing-info.txt
           APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -1)
           $APKSIGNER verify --print-certs build/app/outputs/flutter-apk/app-release.apk >> build/signing-info.txt 2>&1 || true
           cat build/signing-info.txt

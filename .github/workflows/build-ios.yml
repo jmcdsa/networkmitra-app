@@ -1,0 +1,48 @@
+name: Build iPhone app (test build, not signed)
+
+# Run this by hand: GitHub > Actions > "Build iPhone app" > Run workflow.
+# It only checks that the app compiles for iPhone and gives an UNSIGNED app file.
+# To install on a real iPhone or to publish on the App Store you need an Apple Developer account (paid, yearly).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create the iPhone part of the project
+        run: flutter create --platforms=ios --org store.ftc4u --project-name networkmitra .
+
+      - name: Permissions texts and ad app id
+        run: |
+          PL=ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string NetworkMitra needs the camera for photos and video calls." $PL
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string NetworkMitra needs the microphone for calls." $PL
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string NetworkMitra needs your photos to upload pictures." $PL
+          /usr/libexec/PlistBuddy -c "Add :GADApplicationIdentifier string $(tr -d ' \r\n' < admob_app_id.txt)" $PL
+          /usr/libexec/PlistBuddy -c "Add :LSApplicationQueriesSchemes array" $PL
+          /usr/libexec/PlistBuddy -c "Add :LSApplicationQueriesSchemes:0 string whatsapp" $PL
+          /usr/libexec/PlistBuddy -c "Add :LSApplicationQueriesSchemes:1 string tg" $PL
+
+      - run: flutter pub get
+
+      - name: Build (no signing)
+        run: flutter build ios --release --no-codesign
+
+      - name: Pack the app
+        run: |
+          cd build/ios/iphoneos
+          zip -qr ../../../NetworkMitra-iphone-unsigned.zip Runner.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NetworkMitra-iPhone-unsigned
+          path: NetworkMitra-iphone-unsigned.zip
