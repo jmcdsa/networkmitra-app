@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'whatsapp.dart';
 import 'social.dart';
 import 'package:image_picker/image_picker.dart';
@@ -113,6 +114,35 @@ class _ProfileTabState extends State<ProfileTab> {
     }).catchError((_) {});
   }
 
+  Future<void> _deleteAccount() async {
+    final pw = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete my account?'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('All your clients, chats, V-Card, files and videos will be deleted for ever. This cannot be undone. Your Pro time is lost.'),
+          const SizedBox(height: 10),
+          TextField(controller: pw, obscureText: true, decoration: const InputDecoration(labelText: 'Enter your password')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.red), onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await Api.delete('me', {'password': pw.text});
+      await Api.setToken(null);
+      HomeConfig.clear();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (r) => false);
+    } on ApiException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
   Future<void> _pickPhoto() async {
     try {
       final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1024, imageQuality: 85);
@@ -208,7 +238,26 @@ class _ProfileTabState extends State<ProfileTab> {
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WaSetupScreen())),
         ),
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 8),
+      Card(
+        child: Column(children: [
+          for (final l in const [
+            ['Privacy Policy', 'privacy.php', Icons.privacy_tip_outlined],
+            ['Terms and Conditions', 'terms.php', Icons.description_outlined],
+            ['Refund Policy', 'refund.php', Icons.currency_rupee],
+            ['Community Rules', 'community-guidelines.php', Icons.groups_outlined],
+          ])
+            ListTile(
+              dense: true,
+              leading: Icon(l[2] as IconData, color: const Color(0xFF0F766E)),
+              title: Text(l[0] as String),
+              trailing: const Icon(Icons.open_in_new, size: 18),
+              onTap: () => launchUrl(Uri.parse('${kBase.replaceFirst('/api/v1', '')}/${l[1]}'), mode: LaunchMode.externalApplication),
+            ),
+        ]),
+      ),
+      const SizedBox(height: 8),
+      const SizedBox(height: 8),
       OutlinedButton.icon(
         icon: const Icon(Icons.logout),
         label: const Text('Log out'),
@@ -221,6 +270,10 @@ class _ProfileTabState extends State<ProfileTab> {
           if (!context.mounted) return;
           Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (r) => false);
         },
+      ),
+      TextButton(
+        onPressed: _deleteAccount,
+        child: const Text('Delete my account', style: TextStyle(color: Colors.red)),
       ),
     ]);
   }

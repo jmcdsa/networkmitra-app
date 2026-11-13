@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'home.dart';
 import 'widgets.dart';
@@ -254,6 +255,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const Text('You can only connect and chat with people of the company you choose. It cannot be changed later.', style: TextStyle(fontSize: 12, color: Colors.black54)),
           const SizedBox(height: 14),
           if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
+          const Text('By creating an account you agree to our Terms and Privacy Policy:', style: TextStyle(fontSize: 12, color: Colors.black54)),
+          Row(children: [
+            TextButton(
+              onPressed: () => launchUrl(Uri.parse('${kBase.replaceFirst('/api/v1', '')}/terms.php'), mode: LaunchMode.externalApplication),
+              child: const Text('Terms and Conditions'),
+            ),
+            TextButton(
+              onPressed: () => launchUrl(Uri.parse('${kBase.replaceFirst('/api/v1', '')}/privacy.php'), mode: LaunchMode.externalApplication),
+              child: const Text('Privacy Policy'),
+            ),
+          ]),
           BigButton('Create account', busy: busy, onTap: _register),
         ]),
       ),

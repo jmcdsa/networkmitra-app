@@ -62,7 +62,7 @@ class Api {
           r = await http.put(uri, headers: headers, body: enc ?? '{}');
           break;
         case 'DELETE':
-          r = await http.delete(uri, headers: headers);
+          r = await http.delete(uri, headers: headers, body: enc);
           break;
         default:
           r = await http.get(uri, headers: headers);
@@ -127,7 +127,7 @@ class Api {
   static Future<dynamic> get(String path, {Map<String, String>? query}) => call('GET', path, query: query);
   static Future<dynamic> post(String path, Map<String, dynamic> body) => call('POST', path, body: body);
   static Future<dynamic> put(String path, Map<String, dynamic> body) => call('PUT', path, body: body);
-  static Future<dynamic> delete(String path) => call('DELETE', path);
+  static Future<dynamic> delete(String path, [Map<String, dynamic>? body]) => call('DELETE', path, body: body);
 
   static Future<void> refreshMe() async {
     final d = await get('me');
