@@ -102,6 +102,13 @@ jobs:
 
       - run: flutter pub get
 
+      - name: Make old plugins work with the new Gradle
+        run: |
+          for f in $(find ~/.pub-cache/hosted/pub.dev -path '*google_mobile_ads-*/android/build.gradle' 2>/dev/null); do
+            echo "Patching $f"
+            sed -i 's/configurations\.all *{/configurations.configureEach {/' "$f"
+          done
+
       - name: Build the APK
         run: |
           for i in 1 2 3; do
