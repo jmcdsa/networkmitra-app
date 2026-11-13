@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ads.dart';
 import 'api.dart';
 import 'auth_screens.dart';
 import 'home.dart';
@@ -37,7 +38,7 @@ class NetworkMitraApp extends StatelessWidget {
         inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
       ),
       // Keeps every screen out of the phone's bottom navigation bar (the top is handled by each screen's own app bar / SafeArea).
-      builder: (context, child) => SafeArea(top: false, child: child ?? const SizedBox()),
+      builder: (context, child) => SafeArea(top: false, child: Column(children: [Expanded(child: child ?? const SizedBox()), const AdFooter()])),
       home: const Splash(),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'lead_finder.dart';
@@ -196,13 +197,40 @@ class _LeadScreenState extends State<LeadScreen> {
       if (widget.leadId == null) {
         await Api.post('leads', body);
       } else {
-        await Api.put('leads/${widget.leadId}', body);
+        final r = await Api.put('leads/${widget.leadId}', body);
+        if (r is Map && r['community'] != null) await _community(r['community'].toString());
       }
       if (mounted) Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       setState(() => error = e.message);
     } finally {
       if (mounted) setState(() => busy = false);
+    }
+  }
+
+  // After "Closed Won": a client who already uses NetworkMitra (same company) joins my community automatically.
+  Future<void> _community(String state) async {
+    if (!mounted) return;
+    if (state == 'connected') {
+      toast(context, 'Sale closed! ${name.text.trim()} is now in your community.');
+    } else if (state == 'limit') {
+      toast(context, 'Sale closed. Your community limit is full, so the client was not added. Upgrade to Pro for more.');
+    } else if (state == 'invite') {
+      final ref = (Api.user?['referral_code'] ?? '').toString();
+      final site = kBase.replaceFirst('/api/v1', '');
+      final msg = 'Welcome to our team! Join me on NetworkMitra, the app for direct sellers: $site${ref.isNotEmpty ? '\nMy referral code: $ref' : ''}';
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Sale closed!'),
+          content: Text('${name.text.trim()} is not on NetworkMitra yet. Invite them, and when they join your company they can be in your community.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Later')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Invite')),
+          ],
+        ),
+      );
+      if (go == true) await Share.share(msg);
     }
   }
 

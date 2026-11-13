@@ -77,9 +77,11 @@ class _UpgradeScreenState extends State<UpgradeScreen> with WidgetsBindingObserv
     if (state == AppLifecycleState.resumed && _payId != null) _checkPayment();
   }
 
-  Future<void> _pay(int priceId) async {
+  Map<String, dynamic> gw = {};
+
+  Future<void> _pay(int priceId, [String? gateway]) async {
     try {
-      final d = await Api.post('payments', {'price_id': priceId});
+      final d = await Api.post('payments', {'price_id': priceId, if (gateway != null) 'gateway': gateway});
       _payId = d['payment_id'] as int;
       _tries = 0;
       await launchUrl(Uri.parse(d['pay_url'] as String), mode: LaunchMode.externalApplication);
@@ -133,6 +135,9 @@ class _UpgradeScreenState extends State<UpgradeScreen> with WidgetsBindingObserv
   Future<void> _load() async {
     try {
       final d = await Api.get('plans');
+      try {
+        gw = Map<String, dynamic>.from(await Api.get('payments/gateways') as Map);
+      } catch (_) {}
       if (mounted) setState(() => plans = asList(d));
     } on ApiException catch (e) {
       if (mounted) setState(() => error = e.message);
@@ -193,10 +198,22 @@ class _UpgradeScreenState extends State<UpgradeScreen> with WidgetsBindingObserv
                 child: ListTile(
                   title: Text('Rs ${(p['amount'] as num) == (p['amount'] as num).roundToDouble() ? (p['amount'] as num).toStringAsFixed(0) : p['amount']}  /  ${p['period']}'),
                   subtitle: isPro ? const Text('Buying again extends your Pro time') : null,
-                  trailing: FilledButton(
-                    onPressed: (_payId != null) ? null : () => _pay(p['price_id'] as int),
-                    child: Text(isPro ? 'Extend' : 'Upgrade'),
-                  ),
+                  trailing: (gw['razorpay'] == true && gw['phonepe'] == true)
+                      ? Column(mainAxisSize: MainAxisSize.min, children: [
+                          FilledButton(
+                            onPressed: (_payId != null) ? null : () => _pay(p['price_id'] as int, 'razorpay'),
+                            child: Text(isPro ? 'Extend (UPI / Card)' : 'UPI / Card'),
+                          ),
+                          const SizedBox(height: 4),
+                          OutlinedButton(
+                            onPressed: (_payId != null) ? null : () => _pay(p['price_id'] as int, 'phonepe'),
+                            child: const Text('PhonePe'),
+                          ),
+                        ])
+                      : FilledButton(
+                          onPressed: (_payId != null) ? null : () => _pay(p['price_id'] as int, gw['phonepe'] == true ? 'phonepe' : null),
+                          child: Text(isPro ? 'Extend' : 'Upgrade'),
+                        ),
                 ),
               )),
         ],

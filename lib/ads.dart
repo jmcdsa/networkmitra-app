@@ -1,0 +1,202 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'api.dart';
+
+/// Home slideshow banners and the ad settings, given by the owner from the admin panel.
+class HomeConfig {
+  static final ValueNotifier<Map<String, dynamic>?> data = ValueNotifier(null);
+
+  static Future<void> load() async {
+    try {
+      data.value = Map<String, dynamic>.from(await Api.get('home/banners') as Map);
+    } catch (_) {}
+  }
+
+  static void clear() => data.value = null;
+
+  static Map<String, dynamic> get _ads {
+    final a = data.value?['ads'];
+    return a is Map ? Map<String, dynamic>.from(a) : <String, dynamic>{};
+  }
+
+  static bool get adsOn => _ads['enabled'] == true;
+  static bool get slideAd => _ads['slide_enabled'] == true;
+  static String get footerUnit => (_ads['footer_unit'] ?? '').toString();
+  static String get slideUnit => (_ads['slide_unit'] ?? '').toString();
+
+  static List<Map<String, dynamic>> get banners {
+    final b = data.value?['banners'];
+    if (b is! List) return [];
+    return b.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+}
+
+/// One Google AdMob banner. Shows nothing until the ad has loaded (so there is never an empty box).
+class AdBanner extends StatefulWidget {
+  final String unit;
+  final AdSize size;
+  const AdBanner({super.key, required this.unit, required this.size});
+  @override
+  State<AdBanner> createState() => _AdBannerState();
+}
+
+class _AdBannerState extends State<AdBanner> {
+  BannerAd? _ad;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    try {
+      await MobileAds.instance.initialize();
+      final ad = BannerAd(
+        adUnitId: widget.unit,
+        size: widget.size,
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdLoaded: (_) {
+            if (mounted) setState(() => _loaded = true);
+          },
+          onAdFailedToLoad: (a, e) => a.dispose(),
+        ),
+      );
+      _ad = ad;
+      await ad.load();
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _ad?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ad = _ad;
+    if (!_loaded || ad == null) return const SizedBox.shrink();
+    return SizedBox(width: widget.size.width.toDouble(), height: widget.size.height.toDouble(), child: AdWidget(ad: ad));
+  }
+}
+
+/// A small ad at the very bottom of the app. Hidden while the keyboard is open and for Pro members.
+class AdFooter extends StatelessWidget {
+  const AdFooter({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Map<String, dynamic>?>(
+      valueListenable: HomeConfig.data,
+      builder: (context, _, __) {
+        if (Api.token == null || !HomeConfig.adsOn || MediaQuery.of(context).viewInsets.bottom > 0) return const SizedBox.shrink();
+        return Container(
+          width: double.infinity,
+          color: Colors.white,
+          alignment: Alignment.center,
+          child: AdBanner(unit: HomeConfig.footerUnit, size: AdSize.banner),
+        );
+      },
+    );
+  }
+}
+
+/// The sliding banners at the top of Home (own banners, and one ad slide if the owner switched it on).
+class BannerSlideshow extends StatefulWidget {
+  const BannerSlideshow({super.key});
+  @override
+  State<BannerSlideshow> createState() => _BannerSlideshowState();
+}
+
+class _BannerSlideshowState extends State<BannerSlideshow> {
+  final PageController _pc = PageController();
+  Timer? _timer;
+  int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || !_pc.hasClients) return;
+      final n = _count();
+      if (n < 2) return;
+      _pc.animateToPage((_page + 1) % n, duration: const Duration(milliseconds: 450), curve: Curves.easeInOut);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pc.dispose();
+    super.dispose();
+  }
+
+  int _count() => HomeConfig.banners.length + (HomeConfig.adsOn && HomeConfig.slideAd ? 1 : 0);
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Map<String, dynamic>?>(
+      valueListenable: HomeConfig.data,
+      builder: (context, _, __) {
+        final banners = HomeConfig.banners;
+        final withAd = HomeConfig.adsOn && HomeConfig.slideAd;
+        final n = banners.length + (withAd ? 1 : 0);
+        if (n == 0) return const SizedBox.shrink();
+        return Column(children: [
+          AspectRatio(
+            aspectRatio: 12 / 5,
+            child: PageView.builder(
+              controller: _pc,
+              itemCount: n,
+              onPageChanged: (i) => setState(() => _page = i),
+              itemBuilder: (_, i) {
+                if (i >= banners.length) {
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.black12)),
+                    alignment: Alignment.center,
+                    child: AdBanner(unit: HomeConfig.slideUnit, size: AdSize.largeBanner),
+                  );
+                }
+                final b = banners[i];
+                final link = (b['link_url'] ?? '').toString();
+                return GestureDetector(
+                  onTap: link.isEmpty ? null : () => launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), color: Colors.black12),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.network(
+                      b['image_url'].toString(),
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.image_not_supported_outlined)),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (n > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                for (var i = 0; i < n; i++)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: i == _page ? 18 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(color: i == _page ? const Color(0xFF0F766E) : Colors.black26, borderRadius: BorderRadius.circular(3)),
+                  ),
+              ]),
+            ),
+        ]);
+      },
+    );
+  }
+}
