@@ -23,7 +23,6 @@ dependencies:
   path_provider: ^2.1.4
   android_intent_plus: ^5.2.0
   flutter_ringtone_player: ^4.0.0+4
-  google_mobile_ads: ">=5.3.1 <9.0.0"
 
 flutter:
   uses-material-design: true
