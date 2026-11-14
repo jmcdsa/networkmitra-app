@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'ads.dart';
 import 'api.dart';
 import 'clients.dart';
+import 'expert.dart';
 import 'lead_finder.dart';
 import 'more.dart';
 import 'notifications.dart';
@@ -91,8 +92,9 @@ class _DashboardTabState extends State<DashboardTab> {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 8, 22),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: [Color(0xFF0F766E), Color(0xFF14B8A6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        gradient: LinearGradient(colors: [Color(0xFF0B4F4A), Color(0xFF14B8A6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+        boxShadow: [BoxShadow(color: Color(0x550F766E), blurRadius: 18, offset: Offset(0, 10))],
       ),
       child: Row(children: [
         Container(
@@ -114,10 +116,22 @@ class _DashboardTabState extends State<DashboardTab> {
             Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             Row(children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: pro ? const Color(0xFFFFC857) : Colors.white24, borderRadius: BorderRadius.circular(10)),
-                child: Text(pro ? 'PRO' : 'FREE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: pro ? Colors.black87 : Colors.white)),
+              GestureDetector(
+                onTap: () => goUpgrade(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    gradient: pro ? const LinearGradient(colors: [Color(0xFFFFE082), Color(0xFFF59E0B)]) : null,
+                    color: pro ? null : Colors.white24,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(1, 2))],
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.workspace_premium_rounded, size: 14, color: pro ? Colors.black87 : Colors.white),
+                    const SizedBox(width: 4),
+                    Text(pro ? "I'm Pro" : 'Pro Now', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: pro ? Colors.black87 : Colors.white)),
+                  ]),
+                ),
               ),
               if (co.isNotEmpty) ...[
                 const SizedBox(width: 8),
@@ -142,7 +156,11 @@ class _DashboardTabState extends State<DashboardTab> {
         child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-        decoration: BoxDecoration(color: c.withOpacity(0.10), borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [Colors.white, c.withOpacity(0.14)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: c.withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 6)), const BoxShadow(color: Colors.white, blurRadius: 2, offset: Offset(-1, -1))],
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(icon, size: 20, color: c),
           const SizedBox(height: 6),
@@ -160,20 +178,25 @@ class _DashboardTabState extends State<DashboardTab> {
       onTap: t.onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: const LinearGradient(colors: [Colors.white, Color(0xFFEAF4F2)], begin: Alignment.topLeft, end: Alignment.bottomRight),
           borderRadius: BorderRadius.circular(18),
-          boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 4))],
+          border: Border.all(color: Colors.white, width: 1.5),
+          boxShadow: [
+            BoxShadow(color: t.colors.first.withOpacity(0.28), blurRadius: 14, offset: const Offset(0, 8)),
+            const BoxShadow(color: Colors.white, blurRadius: 3, offset: Offset(-2, -2)),
+          ],
         ),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Stack(clipBehavior: Clip.none, children: [
             Container(
-              width: 52,
-              height: 52,
+              width: 54,
+              height: 54,
               decoration: BoxDecoration(
                 gradient: LinearGradient(colors: t.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(17),
+                boxShadow: [BoxShadow(color: t.colors.first.withOpacity(0.6), blurRadius: 10, offset: const Offset(0, 6))],
               ),
-              child: Icon(t.icon, color: Colors.white, size: 28),
+              child: Icon(t.icon, color: Colors.white, size: 29, shadows: const [Shadow(color: Colors.black38, blurRadius: 4, offset: Offset(1, 2))]),
             ),
             if (t.locked)
               const Positioned(right: -6, top: -6, child: CircleAvatar(radius: 10, backgroundColor: Colors.white, child: Icon(Icons.lock, size: 13, color: Colors.black54))),
@@ -208,7 +231,7 @@ class _DashboardTabState extends State<DashboardTab> {
       _Tile('Community & chat', Icons.forum_rounded, const [Color(0xFF059669), Color(0xFF34D399)], () => HomeNav.go(2)),
       _Tile('Learn', Icons.menu_book_rounded, const [Color(0xFF4F46E5), Color(0xFF818CF8)], () => HomeNav.go(3)),
       _Tile('My WhatsApp API', Icons.chat_rounded, const [Color(0xFF16A34A), Color(0xFF4ADE80)], () => _push(const WaSetupScreen())),
-      _Tile(isPro ? 'My plan' : 'Go Pro', Icons.workspace_premium_rounded, const [Color(0xFFCA8A04), Color(0xFFFACC15)], () => goUpgrade(context)),
+      _Tile(isPro ? "I'm Pro" : 'Pro Now', Icons.workspace_premium_rounded, const [Color(0xFFB45309), Color(0xFFFFC107)], () => goUpgrade(context)),
     ];
   }
 
@@ -222,7 +245,9 @@ class _DashboardTabState extends State<DashboardTab> {
         _header(),
         const SizedBox(height: 16),
         const BannerSlideshow(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        const ExpertButton(),
+        const SizedBox(height: 4),
         if (error != null) Padding(padding: const EdgeInsets.all(16), child: Text(error!, style: const TextStyle(color: Colors.red))),
         if (s != null)
           Padding(

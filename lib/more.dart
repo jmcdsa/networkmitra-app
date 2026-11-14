@@ -177,6 +177,10 @@ class _VCardScreenState extends State<VCardScreen> {
   final phone = TextEditingController();
   final whatsapp = TextEditingController();
   final email = TextEditingController();
+  final designation = TextEditingController();
+  String cardImage = '';
+  String cardImageUrl = '';
+  bool imgBusy = false;
   String? catalogueUrl;
   String? shareUrl;
   bool isPublic = true;
@@ -199,12 +203,15 @@ class _VCardScreenState extends State<VCardScreen> {
     phone.text = (v['phone'] ?? '').toString();
     whatsapp.text = (v['whatsapp'] ?? '').toString();
     email.text = (v['email'] ?? '').toString();
+    designation.text = (v['designation'] ?? '').toString();
+    cardImage = (v['card_image'] ?? '').toString();
+    cardImageUrl = (v['card_image_url'] ?? '').toString();
     shareUrl = v['share_url'] as String?;
     catalogueUrl = v['catalogue_url'] as String?;
     isPublic = v['is_public'] == true;
     full = v['is_full_card'] == true;
     links = ((v['social_links'] ?? []) as List).map((e) => {'label': '${(e as Map)['label']}', 'url': '${e['url']}'}).toList();
-    products = ((v['products'] ?? []) as List).map((e) => {'name': '${(e as Map)['name']}', 'price': '${e['price'] ?? ''}', 'url': '${e['url'] ?? ''}', 'image': '${e['image'] ?? ''}', 'image_url': '${e['image_url'] ?? ''}'}).toList();
+    products = ((v['products'] ?? []) as List).map((e) => {'id': '${(e as Map)['id'] ?? ''}', 'name': '${e['name']}', 'price': '${e['price'] ?? ''}', 'url': '${e['url'] ?? ''}', 'image': '${e['image'] ?? ''}', 'image_url': '${e['image_url'] ?? ''}'}).toList();
   }
 
   Future<void> _load() async {
@@ -229,6 +236,8 @@ class _VCardScreenState extends State<VCardScreen> {
         'phone': phone.text.trim(),
         'whatsapp': whatsapp.text.trim(),
         'email': email.text.trim(),
+        'designation': designation.text.trim(),
+        'card_image': cardImage,
         'is_public': isPublic,
       };
       if (full) {
@@ -243,6 +252,38 @@ class _VCardScreenState extends State<VCardScreen> {
     } finally {
       if (mounted) setState(() => busy = false);
     }
+  }
+
+  Future<void> _pickCardImage() async {
+    try {
+      final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 85);
+      if (x == null) return;
+      setState(() => imgBusy = true);
+      final d = await Api.upload('vcard/image', 'image', x.path);
+      setState(() {
+        cardImage = '${d['image']}';
+        cardImageUrl = '${d['image_url']}';
+      });
+    } on ApiException catch (e) {
+      if (mounted && e.status != 402) toast(context, e.message);
+    } catch (_) {
+      if (mounted) toast(context, 'Could not use this picture.');
+    }
+    if (mounted) setState(() => imgBusy = false);
+  }
+
+  String _shareText(String url) {
+    final name = (Api.user?['name'] ?? '').toString();
+    final co = Api.user?['company'] is Map ? ((Api.user!['company'] as Map)['name'] ?? '').toString() : '';
+    final role = designation.text.trim();
+    final b = StringBuffer('✨ *$name* ✨\n');
+    if (role.isNotEmpty) b.writeln('🏅 $role');
+    if (co.isNotEmpty) b.writeln('🏢 $co');
+    if (bio.text.trim().isNotEmpty) b.writeln('\n${bio.text.trim()}');
+    b.writeln('\n📱 See my digital visiting card, products and offers:');
+    b.writeln('👉 $url');
+    b.writeln('\nSave my contact and message me anytime. 🙏');
+    return b.toString();
   }
 
   Future<void> _addLink() async {
@@ -267,17 +308,18 @@ class _VCardScreenState extends State<VCardScreen> {
     }
   }
 
-  Future<void> _addProduct() async {
-    final n = TextEditingController();
-    final pr = TextEditingController();
-    final u = TextEditingController(text: 'https://');
-    String image = '', imageUrl = '';
+  Future<void> _addProduct([int? editIndex]) async {
+    final old = editIndex != null ? products[editIndex] : null;
+    final n = TextEditingController(text: old?['name'] ?? '');
+    final pr = TextEditingController(text: old?['price'] ?? '');
+    final u = TextEditingController(text: (old?['url'] ?? '').isEmpty ? 'https://' : old!['url']);
+    String image = old?['image'] ?? '', imageUrl = old?['image_url'] ?? '';
     bool uploading = false;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
-          title: const Text('Add a product'),
+          title: Text(old == null ? 'Add a product' : 'Edit product'),
           content: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               if (imageUrl.isNotEmpty)
@@ -312,14 +354,21 @@ class _VCardScreenState extends State<VCardScreen> {
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: uploading ? null : () => Navigator.pop(ctx, true), child: const Text('Add')),
+            FilledButton(onPressed: uploading ? null : () => Navigator.pop(ctx, true), child: Text(old == null ? 'Add' : 'Update')),
           ],
         ),
       ),
     );
     if (ok == true && n.text.trim().isNotEmpty) {
       final link = u.text.trim() == 'https://' ? '' : u.text.trim();
-      setState(() => products.add({'name': n.text.trim(), 'price': pr.text.trim(), 'url': link, 'image': image, 'image_url': imageUrl}));
+      final item = {'id': old?['id'] ?? '', 'name': n.text.trim(), 'price': pr.text.trim(), 'url': link, 'image': image, 'image_url': imageUrl};
+      setState(() {
+        if (editIndex != null) {
+          products[editIndex] = item;
+        } else {
+          products.add(item);
+        }
+      });
     }
   }
 
@@ -341,7 +390,7 @@ class _VCardScreenState extends State<VCardScreen> {
               label: const Text('Copy'),
             ),
             OutlinedButton.icon(
-              onPressed: () => Share.share(url),
+              onPressed: () => Share.share(url == shareUrl ? _shareText(url) : url),
               icon: const Icon(Icons.share, size: 18),
               label: const Text('Share'),
             ),
@@ -382,7 +431,28 @@ class _VCardScreenState extends State<VCardScreen> {
               if (full && catalogueUrl != null && products.isNotEmpty) _linkCard(catalogueUrl!, 'Your product catalogue link. Share it on WhatsApp, Facebook, Instagram or anywhere.'),
               const SizedBox(height: 10),
               if (!widget.catalogue) ...[
+                Center(
+                  child: Column(children: [
+                    CircleAvatar(
+                      radius: 46,
+                      backgroundColor: const Color(0xFFCCEFEA),
+                      backgroundImage: cardImageUrl.isNotEmpty ? NetworkImage(cardImageUrl) : ((Api.user?['photo_url'] ?? '').toString().isNotEmpty ? NetworkImage(Api.user!['photo_url'].toString()) : null),
+                      child: (cardImageUrl.isEmpty && (Api.user?['photo_url'] ?? '').toString().isEmpty) ? const Icon(Icons.person, size: 44, color: Color(0xFF0F766E)) : null,
+                    ),
+                    TextButton.icon(
+                      onPressed: imgBusy ? null : _pickCardImage,
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                      label: Text(imgBusy ? 'Uploading...' : (cardImage.isEmpty ? 'Card picture (else profile photo is used)' : 'Change card picture')),
+                    ),
+                    if (cardImage.isNotEmpty) TextButton(onPressed: () => setState(() { cardImage = ''; cardImageUrl = ''; }), child: const Text('Use profile photo instead')),
+                  ]),
+                ),
                 field(username, 'Card name in link (small letters, numbers)'),
+                field(designation, 'My position (e.g. Director, MD, Team Leader)'),
+                Wrap(spacing: 6, children: [
+                  for (final d in const ['Director', 'MD', 'Team Leader', 'Distributor', 'Business Partner'])
+                    ActionChip(label: Text(d, style: const TextStyle(fontSize: 12)), onPressed: () => setState(() => designation.text = d)),
+                ]),
                 field(bio, 'About me', lines: 3),
                 field(phone, 'Phone', type: TextInputType.phone),
                 field(whatsapp, 'WhatsApp number', type: TextInputType.phone),
@@ -408,7 +478,11 @@ class _VCardScreenState extends State<VCardScreen> {
                           : const Icon(Icons.image_outlined),
                       title: Text(e.value['name'] ?? ''),
                       subtitle: Text(e.value['price'] ?? ''),
-                      trailing: IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => products.removeAt(e.key))),
+                      onTap: () => _addProduct(e.key),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => _addProduct(e.key)),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => products.removeAt(e.key))),
+                      ]),
                     )),
                 TextButton.icon(onPressed: _addProduct, icon: const Icon(Icons.add), label: const Text('Add product')),
               ] else ...[

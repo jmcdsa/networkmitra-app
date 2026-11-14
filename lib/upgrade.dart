@@ -22,6 +22,7 @@ const Map<String, String> kFeatureNames = {
   'posters': 'Posters',
   'templates': 'Templates',
   'vcard_full': 'V-Card links and products',
+  'ask_expert': 'Ask the expert (chat)',
 };
 
 bool featureOn(String key) {
@@ -68,6 +69,7 @@ class _UpgradeScreenState extends State<UpgradeScreen> with WidgetsBindingObserv
   @override
   void dispose() {
     _timer?.cancel();
+    _coupon.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -78,10 +80,164 @@ class _UpgradeScreenState extends State<UpgradeScreen> with WidgetsBindingObserv
   }
 
   Map<String, dynamic> gw = {};
+  int _sel = 0;
+  final _coupon = TextEditingController();
+  Map<String, dynamic>? _quote;
+  String? _couponErr;
+
+  String _rs(num v) => 'Rs ${v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2)}';
+
+  Future<void> _applyCoupon(int priceId) async {
+    final c = _coupon.text.trim();
+    if (c.isEmpty) {
+      setState(() { _quote = null; _couponErr = null; });
+      return;
+    }
+    try {
+      final d = Map<String, dynamic>.from(await Api.post('payments/quote', {'price_id': priceId, 'coupon': c}) as Map);
+      setState(() {
+        _quote = d['ok'] == true ? d : null;
+        _couponErr = d['ok'] == true ? null : (d['error'] ?? 'Coupon not valid').toString();
+      });
+    } on ApiException catch (e) {
+      setState(() { _quote = null; _couponErr = e.message; });
+    }
+  }
+
+  Widget _card3d({required Widget child, required bool selected, required List<Color> colors}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
+        border: Border.all(color: selected ? const Color(0xFFFFD54F) : Colors.white24, width: selected ? 3 : 1),
+        boxShadow: [
+          BoxShadow(color: colors.last.withOpacity(0.55), blurRadius: selected ? 26 : 14, offset: Offset(0, selected ? 14 : 8)),
+          const BoxShadow(color: Colors.white24, blurRadius: 2, offset: Offset(-2, -2)),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _priceCards(List prices) {
+    if (prices.isEmpty) return const SizedBox();
+    if (_sel >= prices.length) _sel = 0;
+    final cur = Map<String, dynamic>.from(prices[_sel] as Map);
+    final pid = cur['price_id'] as int;
+    final payNow = (_quote != null ? _quote!['payable'] : cur['pay_now']) as num;
+    final themes = [
+      [const Color(0xFF14B8A6), const Color(0xFF0B4F4A)],
+      [const Color(0xFF7C3AED), const Color(0xFF3B1A78)],
+      [const Color(0xFFF59E0B), const Color(0xFF9A3412)],
+    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: const [
+        Icon(Icons.workspace_premium, color: Color(0xFFF59E0B)),
+        SizedBox(width: 6),
+        Text('Choose your Pro plan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+      ]),
+      for (var i = 0; i < prices.length; i++)
+        Builder(builder: (_) {
+          final p = Map<String, dynamic>.from(prices[i] as Map);
+          final sel = i == _sel;
+          final mrp = (p['mrp'] as num?) ?? 0;
+          final intro = p['intro_active'] == true;
+          final now = p['pay_now'] as num;
+          final months = (p['months'] as num).toInt();
+          final label = (p['offer_label'] ?? '').toString();
+          return GestureDetector(
+            onTap: () => setState(() { _sel = i; _quote = null; _couponErr = null; }),
+            child: AnimatedScale(
+              scale: sel ? 1.0 : 0.96,
+              duration: const Duration(milliseconds: 200),
+              child: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.identity()..setEntry(3, 2, 0.0008)..rotateX(sel ? 0.0 : 0.05),
+                child: _card3d(
+                  selected: sel,
+                  colors: themes[i % themes.length].cast<Color>(),
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        Icon(sel ? Icons.check_circle : Icons.circle_outlined, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Text((p['label'] ?? p['period']).toString(), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                        const Spacer(),
+                        if (label.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: const Color(0xFFFFD54F), borderRadius: BorderRadius.circular(20)),
+                            child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.black87)),
+                          ),
+                      ]),
+                      const SizedBox(height: 10),
+                      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        Text(_rs(now), style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black38, blurRadius: 6, offset: Offset(2, 3))])),
+                        const SizedBox(width: 8),
+                        if (mrp > now || (intro && (p['amount'] as num) > now))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Text(_rs(mrp > now ? mrp : p['amount'] as num), style: const TextStyle(color: Colors.white70, decoration: TextDecoration.lineThrough)),
+                          ),
+                      ]),
+                      if (intro)
+                        Text('Intro price for ${p['intro_count']} purchase(s), then ${_rs(p['amount'] as num)}', style: const TextStyle(color: Colors.white, fontSize: 12))
+                      else if (months > 1)
+                        Text('Only ${_rs(now / months)} per month', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      const SizedBox(height: 4),
+      Row(children: [
+        Expanded(
+          child: TextField(
+            controller: _coupon,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(labelText: 'Coupon code (optional)', border: const OutlineInputBorder(), prefixIcon: const Icon(Icons.local_offer_outlined), errorText: _couponErr),
+          ),
+        ),
+        const SizedBox(width: 8),
+        FilledButton(onPressed: () => _applyCoupon(pid), child: const Text('Apply')),
+      ]),
+      if (_quote != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text('Coupon applied: you save ${_rs(_quote!['discount'] as num)}', style: const TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.w700)),
+        ),
+      const SizedBox(height: 12),
+      if (isPro) const Padding(padding: EdgeInsets.only(bottom: 6), child: Text('Buying again extends your Pro time.', style: TextStyle(color: Colors.black54))),
+      if (gw['razorpay'] == true && gw['phonepe'] == true) ...[
+        FilledButton.icon(
+          style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+          icon: const Icon(Icons.workspace_premium),
+          onPressed: _payId != null ? null : () => _pay(pid, 'razorpay'),
+          label: Text('Pay ${_rs(payNow)}  (UPI / Card)'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+          onPressed: _payId != null ? null : () => _pay(pid, 'phonepe'),
+          child: Text('Pay ${_rs(payNow)} with PhonePe'),
+        ),
+      ] else
+        FilledButton.icon(
+          style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+          icon: const Icon(Icons.workspace_premium),
+          onPressed: _payId != null ? null : () => _pay(pid, gw['phonepe'] == true ? 'phonepe' : null),
+          label: Text('${isPro ? 'Extend' : 'Go Pro'} - Pay ${_rs(payNow)}'),
+        ),
+    ]);
+  }
 
   Future<void> _pay(int priceId, [String? gateway]) async {
     try {
-      final d = await Api.post('payments', {'price_id': priceId, if (gateway != null) 'gateway': gateway});
+      final d = await Api.post('payments', {'price_id': priceId, if (gateway != null) 'gateway': gateway, if (_coupon.text.trim().isNotEmpty) 'coupon': _coupon.text.trim()});
       _payId = d['payment_id'] as int;
       _tries = 0;
       await launchUrl(Uri.parse(d['pay_url'] as String), mode: LaunchMode.externalApplication);
@@ -173,7 +329,9 @@ class _UpgradeScreenState extends State<UpgradeScreen> with WidgetsBindingObserv
         if (error != null) Text(error!, style: const TextStyle(color: Colors.red)),
         if (plans.isEmpty && error == null) const Center(child: Padding(padding: EdgeInsets.all(30), child: CircularProgressIndicator())),
         if (pp != null) ...[
-          const SizedBox(height: 8),
+          _priceCards(prices),
+          const SizedBox(height: 18),
+          const Text('What you get', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
           Row(children: const [
             Expanded(child: SizedBox()),
             SizedBox(width: 90, child: Text('Free', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700))),
@@ -193,29 +351,6 @@ class _UpgradeScreenState extends State<UpgradeScreen> with WidgetsBindingObserv
             );
           }),
           const Divider(),
-          const SizedBox(height: 8),
-          ...prices.map((p) => Card(
-                child: ListTile(
-                  title: Text('Rs ${(p['amount'] as num) == (p['amount'] as num).roundToDouble() ? (p['amount'] as num).toStringAsFixed(0) : p['amount']}  /  ${p['period']}'),
-                  subtitle: isPro ? const Text('Buying again extends your Pro time') : null,
-                  trailing: (gw['razorpay'] == true && gw['phonepe'] == true)
-                      ? Column(mainAxisSize: MainAxisSize.min, children: [
-                          FilledButton(
-                            onPressed: (_payId != null) ? null : () => _pay(p['price_id'] as int, 'razorpay'),
-                            child: Text(isPro ? 'Extend (UPI / Card)' : 'UPI / Card'),
-                          ),
-                          const SizedBox(height: 4),
-                          OutlinedButton(
-                            onPressed: (_payId != null) ? null : () => _pay(p['price_id'] as int, 'phonepe'),
-                            child: const Text('PhonePe'),
-                          ),
-                        ])
-                      : FilledButton(
-                          onPressed: (_payId != null) ? null : () => _pay(p['price_id'] as int, gw['phonepe'] == true ? 'phonepe' : null),
-                          child: Text(isPro ? 'Extend' : 'Upgrade'),
-                        ),
-                ),
-              )),
         ],
       ]),
     );
