@@ -25,4 +25,6 @@ dependencies:
   flutter_ringtone_player: ^4.0.0+4
 
 flutter:
+  assets:
+    - assets/
   uses-material-design: true

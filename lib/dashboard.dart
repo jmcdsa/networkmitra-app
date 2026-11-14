@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'ads.dart';
 import 'api.dart';
+import 'clients.dart';
 import 'lead_finder.dart';
 import 'more.dart';
 import 'notifications.dart';
@@ -62,7 +63,25 @@ class _DashboardTabState extends State<DashboardTab> {
     if (mounted) setState(() {});
   }
 
-  void _push(Widget w) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
+  Future<void> _push(Widget w) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
+
+  void _openStage(Map<String, dynamic> s, String name, String title) {
+    for (final b in (s['by_status'] as List)) {
+      if (b['name'] == name) {
+        _push(ClientsTab(statusId: b['id'] as int, title: title)).then((_) => _load());
+        return;
+      }
+    }
+  }
+
+  Color _stageColor(String name, int i) {
+    final n = name.toLowerCase();
+    if (n.contains('won')) return const Color(0xFF16A34A);
+    if (n.contains('lost')) return const Color(0xFFDC2626);
+    if (n.contains('new')) return const Color(0xFF2563EB);
+    const palette = [Color(0xFF7C3AED), Color(0xFFEA580C), Color(0xFF0891B2), Color(0xFFDB2777), Color(0xFFCA8A04), Color(0xFF0F766E)];
+    return palette[i % palette.length];
+  }
 
   Widget _header() {
     final name = (Api.user?['name'] ?? '').toString();
@@ -115,9 +134,12 @@ class _DashboardTabState extends State<DashboardTab> {
     );
   }
 
-  Widget _stat(String label, String value, IconData icon, Color c) {
+  Widget _stat(String label, String value, IconData icon, Color c, VoidCallback onTap) {
     return Expanded(
-      child: Container(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         decoration: BoxDecoration(color: c.withOpacity(0.10), borderRadius: BorderRadius.circular(16)),
@@ -127,6 +149,7 @@ class _DashboardTabState extends State<DashboardTab> {
           Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: c)),
           Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
         ]),
+        ),
       ),
     );
   }
@@ -179,7 +202,7 @@ class _DashboardTabState extends State<DashboardTab> {
           locked: !featureOn('lead_search')),
       _Tile('Targets & sales', Icons.flag_rounded, const [Color(0xFFDC2626), Color(0xFFFB7185)], () => _push(const TargetsScreen())),
       _Tile('Digital V-Card', Icons.badge_rounded, const [Color(0xFF7C3AED), Color(0xFFA78BFA)], () => _push(const VCardScreen())),
-      _Tile('Product catalogue', Icons.storefront_rounded, const [Color(0xFFDB2777), Color(0xFFF472B6)], () => _push(const VCardScreen())),
+      _Tile('Product catalogue', Icons.storefront_rounded, const [Color(0xFFDB2777), Color(0xFFF472B6)], () => _push(const VCardScreen(catalogue: true))),
       _Tile('Posters & templates', Icons.photo_library_rounded, const [Color(0xFF0891B2), Color(0xFF22D3EE)], () => HomeNav.go(4)),
       _Tile('Videos', Icons.play_circle_fill_rounded, const [Color(0xFFE11D48), Color(0xFFFB923C)], () => _push(Scaffold(appBar: AppBar(title: const Text('Videos')), body: const VideosTab()))),
       _Tile('Community & chat', Icons.forum_rounded, const [Color(0xFF059669), Color(0xFF34D399)], () => HomeNav.go(2)),
@@ -205,9 +228,9 @@ class _DashboardTabState extends State<DashboardTab> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(children: [
-              _stat('Clients', '${s['total_clients']}', Icons.people, const Color(0xFF0F766E)),
-              _stat('Sales won', '${s['closed_won']}', Icons.emoji_events, const Color(0xFFD97706)),
-              _stat('Follow-ups today', '${today.length}', Icons.alarm, const Color(0xFFDC2626)),
+              _stat('Clients', '${s['total_clients']}', Icons.people, const Color(0xFF0F766E), () => HomeNav.go(1)),
+              _stat('Sales won', '${s['closed_won']}', Icons.emoji_events, const Color(0xFFD97706), () => _openStage(s, 'Closed Won', 'Sales won')),
+              _stat('Follow-ups today', '${today.length}', Icons.alarm, const Color(0xFFDC2626), () => _push(const FollowupsScreen()).then((_) => _load())),
             ]),
           ),
         const Padding(padding: EdgeInsets.fromLTRB(20, 18, 20, 10), child: Text('Everything in one place', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
@@ -229,19 +252,27 @@ class _DashboardTabState extends State<DashboardTab> {
         ...today.map((f) => Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFFFEE2E2), child: Icon(Icons.alarm, color: Color(0xFFDC2626))),
                 title: Text(f['lead_name'].toString()),
-                subtitle: Text('${fmtDate(f['due_at'] as String?)}${(f['note'] ?? '').toString().isEmpty ? '' : '\n${f['note']}'}'),
-                isThreeLine: (f['note'] ?? '').toString().isNotEmpty,
-                trailing: IconButton(
-                  icon: const Icon(Icons.check_circle_outline),
-                  onPressed: () async {
-                    try {
-                      await Api.put('followups/${f['id']}', {'done': true});
+                subtitle: Text(fmtDate(f['due_at'] as String?)),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (v) async {
+                    if (v == 'details') {
+                      await _push(LeadScreen(leadId: f['lead_id'] as int));
                       _load();
-                    } on ApiException catch (e) {
-                      if (context.mounted) toast(context, e.message);
+                    } else if (v == 'done') {
+                      try {
+                        await Api.put('followups/${f['id']}', {'done': true});
+                        _load();
+                      } on ApiException catch (e) {
+                        if (context.mounted) toast(context, e.message);
+                      }
                     }
                   },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'details', child: Text('View details')),
+                    PopupMenuItem(value: 'done', child: Text('Mark as done')),
+                  ],
                 ),
               ),
             )),
@@ -250,11 +281,91 @@ class _DashboardTabState extends State<DashboardTab> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final b in (s['by_status'] as List)) Chip(label: Text('${b['name']}  ${b['count']}')),
+              for (final e in (s['by_status'] as List).asMap().entries)
+                ActionChip(
+                  backgroundColor: _stageColor(e.value['name'].toString(), e.key),
+                  side: BorderSide.none,
+                  label: Text('${e.value['name']}  ${e.value['count']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  onPressed: () => _push(ClientsTab(statusId: e.value['id'] as int, title: e.value['name'].toString())).then((_) => _load()),
+                ),
             ]),
           ),
         ],
         const SizedBox(height: 24),
+      ]),
+    );
+  }
+}
+
+
+/// All follow-ups: today, overdue and upcoming. Tap one to open the client.
+class FollowupsScreen extends StatefulWidget {
+  const FollowupsScreen({super.key});
+  @override
+  State<FollowupsScreen> createState() => _FollowupsScreenState();
+}
+
+class _FollowupsScreenState extends State<FollowupsScreen> {
+  String due = 'today';
+  List<Map<String, dynamic>> items = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => loading = true);
+    try {
+      final f = await Api.get('followups', query: {'due': due});
+      items = (f as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } on ApiException catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+    if (mounted) setState(() => loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Follow-ups')),
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Wrap(spacing: 8, children: [
+            for (final o in const [['today', 'Today'], ['overdue', 'Overdue'], ['upcoming', 'Upcoming']])
+              ChoiceChip(
+                label: Text(o[1]),
+                selected: due == o[0],
+                onSelected: (_) {
+                  due = o[0];
+                  _load();
+                },
+              ),
+          ]),
+        ),
+        Expanded(
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : items.isEmpty
+                  ? const Center(child: Text('Nothing here.'))
+                  : ListView(children: [
+                      for (final f in items)
+                        ListTile(
+                          leading: const CircleAvatar(backgroundColor: Color(0xFFFEE2E2), child: Icon(Icons.alarm, color: Color(0xFFDC2626))),
+                          title: Text(f['lead_name'].toString()),
+                          subtitle: Text('${fmtDate(f['due_at'] as String?)}${(f['note'] ?? '').toString().isEmpty ? '' : '\n${f['note']}'}'),
+                          isThreeLine: (f['note'] ?? '').toString().isNotEmpty,
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () async {
+                            await Navigator.of(context).push(MaterialPageRoute(builder: (_) => LeadScreen(leadId: f['lead_id'] as int)));
+                            _load();
+                          },
+                        ),
+                    ]),
+        ),
       ]),
     );
   }

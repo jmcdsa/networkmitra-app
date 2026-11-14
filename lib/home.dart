@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'whatsapp.dart';
 import 'social.dart';
@@ -70,6 +71,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[const DashboardTab(), const ClientsTab(), const ChatHubTab(), const KbTab(), const SocialScreen(), const ProfileTab()];
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        if (tab != 0) {
+          setState(() => tab = 0);
+          return;
+        }
+        final now = DateTime.now();
+        if (_lastBack == null || now.difference(_lastBack!) > const Duration(seconds: 2)) {
+          _lastBack = now;
+          toast(context, 'Press back again to exit');
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: _scaffold(pages),
+    );
+  }
+
+  DateTime? _lastBack;
+
+  Widget _scaffold(List<Widget> pages) {
     return Scaffold(
       body: SafeArea(child: pages[tab]),
       bottomNavigationBar: NavigationBar(

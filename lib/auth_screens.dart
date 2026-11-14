@@ -71,6 +71,8 @@ class _LoginScreenState extends State<LoginScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Center(child: ClipRRect(borderRadius: BorderRadius.circular(22), child: Image.asset('assets/logo.png', width: 84, height: 84))),
+                const SizedBox(height: 10),
                 const Text('NetworkMitra', textAlign: TextAlign.center, style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Color(0xFF0F766E))),
                 const SizedBox(height: 4),
                 const Text('The app for direct sellers', textAlign: TextAlign.center),

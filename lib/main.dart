@@ -50,14 +50,24 @@ class Splash extends StatefulWidget {
   State<Splash> createState() => _SplashState();
 }
 
-class _SplashState extends State<Splash> {
+class _SplashState extends State<Splash> with SingleTickerProviderStateMixin {
+  late final AnimationController _ac = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+
   @override
   void initState() {
     super.initState();
+    _ac.forward();
     _start();
   }
 
+  @override
+  void dispose() {
+    _ac.dispose();
+    super.dispose();
+  }
+
   Future<void> _start() async {
+    final minShow = Future.delayed(const Duration(milliseconds: 1700));
     Widget next = const LoginScreen();
     if (Api.token != null) {
       try {
@@ -68,12 +78,60 @@ class _SplashState extends State<Splash> {
         if (e.code == 'network') next = const HomeScreen();
       }
     }
+    await minShow;
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => next));
+    Navigator.of(context).pushReplacement(PageRouteBuilder(
+      pageBuilder: (_, __, ___) => next,
+      transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
+      transitionDuration: const Duration(milliseconds: 400),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final scale = CurvedAnimation(parent: _ac, curve: Curves.elasticOut);
+    final fade = CurvedAnimation(parent: _ac, curve: const Interval(0.0, 0.6, curve: Curves.easeIn));
+    final textFade = CurvedAnimation(parent: _ac, curve: const Interval(0.5, 1.0, curve: Curves.easeIn));
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(colors: [Color(0xFF0B5D56), Color(0xFF0F766E), Color(0xFF14B8A6)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        ),
+        child: SafeArea(
+          child: Column(children: [
+            const Spacer(flex: 3),
+            FadeTransition(
+              opacity: fade,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.4, end: 1).animate(scale),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(34),
+                    boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 30, offset: Offset(0, 14))],
+                  ),
+                  child: ClipRRect(borderRadius: BorderRadius.circular(34), child: Image.asset('assets/logo_splash.png', width: 128, height: 128)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 26),
+            FadeTransition(
+              opacity: textFade,
+              child: const Column(children: [
+                Text('NetworkMitra', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                SizedBox(height: 8),
+                Text('Grow your network. Grow your business.', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              ]),
+            ),
+            const Spacer(flex: 3),
+            FadeTransition(
+              opacity: textFade,
+              child: const SizedBox(width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white70)),
+            ),
+            const SizedBox(height: 40),
+          ]),
+        ),
+      ),
+    );
   }
 }

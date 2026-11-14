@@ -9,7 +9,9 @@ import 'upgrade.dart';
 import 'whatsapp.dart';
 
 class ClientsTab extends StatefulWidget {
-  const ClientsTab({super.key});
+  final int? statusId;
+  final String? title;
+  const ClientsTab({super.key, this.statusId, this.title});
   @override
   State<ClientsTab> createState() => _ClientsTabState();
 }
@@ -28,7 +30,7 @@ class _ClientsTabState extends State<ClientsTab> {
 
   Future<void> _load() async {
     try {
-      final d = await Api.get('leads', query: {'q': search.text.trim(), 'per_page': '100'});
+      final d = await Api.get('leads', query: {'q': search.text.trim(), 'per_page': '100', if (widget.statusId != null) 'status_id': '${widget.statusId}'});
       if (!mounted) return;
       setState(() {
         items = (d['items'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -53,6 +55,7 @@ class _ClientsTabState extends State<ClientsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: widget.title != null ? AppBar(title: Text(widget.title!)) : null,
       floatingActionButton: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
         FloatingActionButton.extended(
           heroTag: 'pool',

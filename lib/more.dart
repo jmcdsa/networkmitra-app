@@ -165,7 +165,8 @@ class _TargetsScreenState extends State<TargetsScreen> {
 // ---------------- V-Card ----------------
 
 class VCardScreen extends StatefulWidget {
-  const VCardScreen({super.key});
+  final bool catalogue;
+  const VCardScreen({super.key, this.catalogue = false});
   @override
   State<VCardScreen> createState() => _VCardScreenState();
 }
@@ -371,28 +372,34 @@ class _VCardScreenState extends State<VCardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My digital V-Card')),
+      appBar: AppBar(title: Text(widget.catalogue ? 'Product catalogue' : 'My digital V-Card')),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(padding: const EdgeInsets.all(20), children: [
-              if (shareUrl != null) _linkCard(shareUrl!, 'Your card link. Share it with clients.'),
+              if (widget.catalogue)
+                const Padding(padding: EdgeInsets.only(bottom: 10), child: Text('Add your products with pictures and prices, press Save, then share the catalogue link anywhere.', style: TextStyle(color: Colors.black54))),
+              if (!widget.catalogue && shareUrl != null) _linkCard(shareUrl!, 'Your card link. Share it with clients.'),
               if (full && catalogueUrl != null && products.isNotEmpty) _linkCard(catalogueUrl!, 'Your product catalogue link. Share it on WhatsApp, Facebook, Instagram or anywhere.'),
               const SizedBox(height: 10),
-              field(username, 'Card name in link (small letters, numbers)'),
-              field(bio, 'About me', lines: 3),
-              field(phone, 'Phone', type: TextInputType.phone),
-              field(whatsapp, 'WhatsApp number', type: TextInputType.phone),
-              field(email, 'Email', type: TextInputType.emailAddress),
-              SwitchListTile(value: isPublic, onChanged: (v) => setState(() => isPublic = v), title: const Text('Card is public')),
+              if (!widget.catalogue) ...[
+                field(username, 'Card name in link (small letters, numbers)'),
+                field(bio, 'About me', lines: 3),
+                field(phone, 'Phone', type: TextInputType.phone),
+                field(whatsapp, 'WhatsApp number', type: TextInputType.phone),
+                field(email, 'Email', type: TextInputType.emailAddress),
+                SwitchListTile(value: isPublic, onChanged: (v) => setState(() => isPublic = v), title: const Text('Card is public')),
+              ],
               if (full) ...[
-                const Text('Links', style: TextStyle(fontWeight: FontWeight.w700)),
-                ...links.asMap().entries.map((e) => ListTile(
-                      dense: true,
-                      title: Text(e.value['label'] ?? ''),
-                      subtitle: Text(e.value['url'] ?? ''),
-                      trailing: IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => links.removeAt(e.key))),
-                    )),
-                TextButton.icon(onPressed: _addLink, icon: const Icon(Icons.add), label: const Text('Add link')),
+                if (!widget.catalogue) ...[
+                  const Text('Links', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ...links.asMap().entries.map((e) => ListTile(
+                        dense: true,
+                        title: Text(e.value['label'] ?? ''),
+                        subtitle: Text(e.value['url'] ?? ''),
+                        trailing: IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => links.removeAt(e.key))),
+                      )),
+                  TextButton.icon(onPressed: _addLink, icon: const Icon(Icons.add), label: const Text('Add link')),
+                ],
                 const Text('Products', style: TextStyle(fontWeight: FontWeight.w700)),
                 ...products.asMap().entries.map((e) => ListTile(
                       dense: true,
@@ -405,11 +412,11 @@ class _VCardScreenState extends State<VCardScreen> {
                     )),
                 TextButton.icon(onPressed: _addProduct, icon: const Icon(Icons.add), label: const Text('Add product')),
               ] else ...[
-                _lockedSection('Links on my card', Icons.link),
+                if (!widget.catalogue) _lockedSection('Links on my card', Icons.link),
                 _lockedSection('Products on my card', Icons.shopping_bag_outlined),
               ],
               if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
-              BigButton('Save V-Card', busy: busy, onTap: _save),
+              BigButton(widget.catalogue ? 'Save catalogue' : 'Save V-Card', busy: busy, onTap: _save),
             ]),
     );
   }
